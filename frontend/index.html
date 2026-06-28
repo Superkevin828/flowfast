@@ -1,111 +1,187 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>FlowFast | Transform messy data into structured intelligence</title>
-    <meta name="description" content="FlowFast helps teams turn uploads, OCR, and messy documents into structured data pipelines." />
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <header class="hero-shell">
-      <nav class="top-nav container">
-        <a class="brand" href="/">FlowFast</a>
-        <div class="nav-links">
-          <a href="#features">Features</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#contact">Contact</a>
-          <button class="theme-toggle" id="themeToggle">☀︎</button>
-        </div>
-      </nav>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowFast — AI Document Intelligence for African SMEs</title>
+  <meta name="description" content="Upload invoices, receipts, and financial documents. FlowFast extracts structured data and lets you chat with your business files using Claude AI." />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <!-- NAV -->
+  <nav class="landing-nav">
+    <div class="brand"><span class="dot"></span>FlowFast</div>
+    <div style="display:flex;align-items:center;gap:0.5rem;">
+      <a href="/pricing" class="btn ghost text-sm">Pricing</a>
+      <button class="theme-btn" id="themeToggle" title="Toggle theme">◐</button>
+    </div>
+  </nav>
 
-      <section class="hero container">
-        <div class="hero-copy">
-          <p class="eyebrow">AI-powered data operations</p>
-          <h1>Transform messy data into structured intelligence.</h1>
-          <p class="hero-text">Upload documents, invoices, PDFs, spreadsheets, and images. FlowFast extracts, cleans, maps, and helps you chat with your data in minutes.</p>
+  <!-- HERO -->
+  <section class="hero-section">
+    <div class="container">
+      <div class="hero-grid">
+        <!-- LEFT COPY -->
+        <div>
+          <div class="hero-eyebrow">✦ Powered by Claude AI</div>
+          <h1 class="hero-title">Turn messy documents<br>into <span class="accent">clear answers.</span></h1>
+          <p class="hero-desc">Upload invoices, receipts, bank statements, and contracts. FlowFast extracts structured data and lets you chat with your documents in plain language.</p>
           <div class="hero-actions">
-            <a class="btn primary" href="#authPanel">Start free</a>
-            <a class="btn secondary" href="/dashboard">Open dashboard</a>
+            <a href="#auth" class="btn primary">Get started free →</a>
+            <a href="/pricing" class="btn">View pricing</a>
           </div>
-          <ul class="hero-points">
-            <li>OCR-ready pipeline</li>
-            <li>Pluggable AI model layer</li>
-            <li>MongoDB-backed workspace</li>
-          </ul>
+          <div class="hero-stats">
+            <div class="stat"><div class="val">10+</div><div class="lbl">File formats</div></div>
+            <div class="stat"><div class="val">92%</div><div class="lbl">Extraction accuracy</div></div>
+            <div class="stat"><div class="val">< 10s</div><div class="lbl">Per document</div></div>
+          </div>
         </div>
-        <div class="hero-card" id="authPanel">
+
+        <!-- RIGHT AUTH BOX -->
+        <div class="auth-box" id="auth">
           <div class="auth-tabs">
-            <button class="tab active" data-target="login">Login</button>
-            <button class="tab" data-target="register">Register</button>
+            <button class="auth-tab active" data-target="login">Sign in</button>
+            <button class="auth-tab" data-target="register">Create account</button>
           </div>
 
-          <form id="loginForm" class="auth-form">
-            <h3>Welcome back</h3>
-            <input type="email" name="email" placeholder="Email address" required />
-            <input type="password" name="password" placeholder="Password" required />
-            <button class="btn primary full">Sign in</button>
-          </form>
+          <div id="loginForm" class="auth-form-inner">
+            <p class="text-sm muted" style="margin-bottom:0.25rem;">Welcome back</p>
+            <div id="loginError" class="auth-error"></div>
+            <div class="field">
+              <label>Email</label>
+              <input type="email" id="loginEmail" placeholder="you@example.com" required />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input type="password" id="loginPassword" placeholder="••••••••" required />
+            </div>
+            <button class="btn primary full" id="loginBtn">Sign in</button>
+            <p class="text-xs muted" style="text-align:center;">Don't have an account? Click "Create account" above.</p>
+          </div>
 
-          <form id="registerForm" class="auth-form hidden">
-            <h3>Create an account</h3>
-            <input type="text" name="name" placeholder="Full name" required />
-            <input type="email" name="email" placeholder="Email address" required />
-            <input type="password" name="password" placeholder="Password" required />
-            <button class="btn primary full">Create account</button>
-          </form>
+          <div id="registerForm" class="auth-form-inner hidden">
+            <p class="text-sm muted" style="margin-bottom:0.25rem;">Start for free — no card needed</p>
+            <div id="registerError" class="auth-error"></div>
+            <div class="field">
+              <label>Full name</label>
+              <input type="text" id="regName" placeholder="Jane Mukasa" required />
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input type="email" id="regEmail" placeholder="you@example.com" required />
+            </div>
+            <div class="field">
+              <label>Password</label>
+              <input type="password" id="regPassword" placeholder="Min 6 characters" required />
+            </div>
+            <button class="btn primary full" id="registerBtn">Create account →</button>
+          </div>
         </div>
-      </section>
-    </header>
-
-    <main>
-      <section class="container section" id="features">
-        <h2>Everything your data team needs</h2>
-        <div class="grid three">
-          <article class="card">
-            <h3>Smart extraction</h3>
-            <p>Convert invoices, statements, and forms into structured JSON with confidence scoring.</p>
-          </article>
-          <article class="card">
-            <h3>AI chat</h3>
-            <p>Ask questions like “show unpaid invoices” and get grounded answers from your uploads.</p>
-          </article>
-          <article class="card">
-            <h3>Flexible mapping</h3>
-            <p>Connect uploaded fields to target schemas and keep verified mappings for future imports.</p>
-          </article>
-        </div>
-      </section>
-
-      <section class="container section" id="pricing">
-        <h2>Simple, premium pricing</h2>
-        <div class="grid three">
-          <article class="card">
-            <h3>Starter</h3>
-            <p class="price">$19<span>/mo</span></p>
-            <p>100 uploads, AI extraction, dashboards.</p>
-          </article>
-          <article class="card featured">
-            <h3>Professional</h3>
-            <p class="price">$79<span>/mo</span></p>
-            <p>Unlimited workflows, chat, mappings, and analytics.</p>
-          </article>
-          <article class="card">
-            <h3>Enterprise</h3>
-            <p class="price">Custom</p>
-            <p>Dedicated workspace, governance, and support.</p>
-          </article>
-        </div>
-      </section>
-    </main>
-
-    <footer class="footer" id="contact">
-      <div class="container footer-inner">
-        <p>FlowFast © 2026</p>
-        <a href="mailto:hello@flowfast.ai">hello@flowfast.ai</a>
       </div>
-    </footer>
+    </div>
+  </section>
 
-    <script src="/app.js"></script>
-  </body>
+  <!-- FEATURES -->
+  <section class="features-section">
+    <div class="container">
+      <div class="section-label">What FlowFast does</div>
+      <h2 class="section-title">From raw files to business intelligence</h2>
+      <p class="section-desc">No more manual data entry. Drop a file, ask a question, get an answer.</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">📄</div>
+          <h3>Smart extraction</h3>
+          <p>Claude AI reads your invoices, receipts, and contracts and pulls out names, amounts, dates, and more — structured as clean JSON.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💬</div>
+          <h3>Document chat</h3>
+          <p>Ask questions in plain language: "What's the total owed on this invoice?" or "List all contacts from my documents."</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🗺️</div>
+          <h3>Field mapping</h3>
+          <p>Map extracted fields to your own schema. Save rules so the same document type is always processed the same way.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer-band">
+    <div class="container footer-inner">
+      <p>© 2026 FlowFast. Built for East African SMEs.</p>
+      <a href="/pricing" class="text-sm muted">Pricing</a>
+    </div>
+  </footer>
+
+  <script src="/app.js"></script>
+  <script>
+    // Auth tab switching
+    document.querySelectorAll('.auth-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        document.querySelectorAll('.auth-form-inner').forEach(f => f.classList.add('hidden'));
+        document.getElementById(tab.dataset.target + 'Form').classList.remove('hidden');
+      });
+    });
+
+    async function authAction(email, password, name, isRegister) {
+      const path = isRegister ? '/auth/register' : '/auth/login';
+      const body = isRegister ? { name, email, password } : { email, password };
+      const res = await fetch('/api' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Authentication failed');
+      return data;
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('loginBtn');
+      const errEl = document.getElementById('loginError');
+      errEl.classList.remove('show');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner-sm"></span> Signing in…';
+      try {
+        const data = await authAction(
+          document.getElementById('loginEmail').value,
+          document.getElementById('loginPassword').value,
+          null, false
+        );
+        localStorage.setItem('flowfast-token', data.token);
+        window.location.href = '/dashboard';
+      } catch (err) {
+        errEl.textContent = err.message; errEl.classList.add('show');
+        btn.disabled = false; btn.textContent = 'Sign in';
+      }
+    });
+
+    document.getElementById('registerBtn').addEventListener('click', async () => {
+      const btn = document.getElementById('registerBtn');
+      const errEl = document.getElementById('registerError');
+      errEl.classList.remove('show');
+      btn.disabled = true; btn.innerHTML = '<span class="spinner-sm"></span> Creating account…';
+      try {
+        const data = await authAction(
+          document.getElementById('regEmail').value,
+          document.getElementById('regPassword').value,
+          document.getElementById('regName').value,
+          true
+        );
+        localStorage.setItem('flowfast-token', data.token);
+        window.location.href = '/dashboard';
+      } catch (err) {
+        errEl.textContent = err.message; errEl.classList.add('show');
+        btn.disabled = false; btn.textContent = 'Create account →';
+      }
+    });
+
+    // Allow Enter key
+    ['loginEmail','loginPassword'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
+    });
+    ['regName','regEmail','regPassword'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('registerBtn').click(); });
+    });
+  </script>
+</body>
 </html>
