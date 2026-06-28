@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowFast AI Chat</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="chat-shell">
+      <aside class="sidebar">
+        <a class="brand" href="/">FlowFast</a>
+        <a href="/dashboard">Dashboard</a>
+        <a class="active" href="/chat">AI Chat</a>
+        <button class="btn primary full" id="newChatButton">+ New chat</button>
+        <div class="list" id="chatList"></div>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div>
+            <h2 id="activeChatTitle" data-chat-id="">AI chat</h2>
+            <p class="muted">Ask questions about your uploaded documents and extracted data.</p>
+          </div>
+          <button class="theme-toggle" id="themeToggle">☾</button>
+        </div>
+
+        <section class="panel">
+          <div class="messages" id="messages"></div>
+          <form class="chat-input" id="chatForm">
+            <input type="text" id="chatInput" placeholder="Try: summarize this invoice, list action items, find the due date, or extract contact details" />
+            <button class="btn primary">Send</button>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

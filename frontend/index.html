@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowFast | Transform messy data into structured intelligence</title>
+    <meta name="description" content="FlowFast helps teams turn uploads, OCR, and messy documents into structured data pipelines." />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="hero-shell">
+      <nav class="top-nav container">
+        <a class="brand" href="/">FlowFast</a>
+        <div class="nav-links">
+          <a href="#features">Features</a>
+          <a href="#pricing">Pricing</a>
+          <a href="#contact">Contact</a>
+          <button class="theme-toggle" id="themeToggle">☀︎</button>
+        </div>
+      </nav>
+
+      <section class="hero container">
+        <div class="hero-copy">
+          <p class="eyebrow">AI-powered data operations</p>
+          <h1>Transform messy data into structured intelligence.</h1>
+          <p class="hero-text">Upload documents, invoices, PDFs, spreadsheets, and images. FlowFast extracts, cleans, maps, and helps you chat with your data in minutes.</p>
+          <div class="hero-actions">
+            <a class="btn primary" href="#authPanel">Start free</a>
+            <a class="btn secondary" href="/dashboard">Open dashboard</a>
+          </div>
+          <ul class="hero-points">
+            <li>OCR-ready pipeline</li>
+            <li>Pluggable AI model layer</li>
+            <li>MongoDB-backed workspace</li>
+          </ul>
+        </div>
+        <div class="hero-card" id="authPanel">
+          <div class="auth-tabs">
+            <button class="tab active" data-target="login">Login</button>
+            <button class="tab" data-target="register">Register</button>
+          </div>
+
+          <form id="loginForm" class="auth-form">
+            <h3>Welcome back</h3>
+            <input type="email" name="email" placeholder="Email address" required />
+            <input type="password" name="password" placeholder="Password" required />
+            <button class="btn primary full">Sign in</button>
+          </form>
+
+          <form id="registerForm" class="auth-form hidden">
+            <h3>Create an account</h3>
+            <input type="text" name="name" placeholder="Full name" required />
+            <input type="email" name="email" placeholder="Email address" required />
+            <input type="password" name="password" placeholder="Password" required />
+            <button class="btn primary full">Create account</button>
+          </form>
+        </div>
+      </section>
+    </header>
+
+    <main>
+      <section class="container section" id="features">
+        <h2>Everything your data team needs</h2>
+        <div class="grid three">
+          <article class="card">
+            <h3>Smart extraction</h3>
+            <p>Convert invoices, statements, and forms into structured JSON with confidence scoring.</p>
+          </article>
+          <article class="card">
+            <h3>AI chat</h3>
+            <p>Ask questions like “show unpaid invoices” and get grounded answers from your uploads.</p>
+          </article>
+          <article class="card">
+            <h3>Flexible mapping</h3>
+            <p>Connect uploaded fields to target schemas and keep verified mappings for future imports.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="container section" id="pricing">
+        <h2>Simple, premium pricing</h2>
+        <div class="grid three">
+          <article class="card">
+            <h3>Starter</h3>
+            <p class="price">$19<span>/mo</span></p>
+            <p>100 uploads, AI extraction, dashboards.</p>
+          </article>
+          <article class="card featured">
+            <h3>Professional</h3>
+            <p class="price">$79<span>/mo</span></p>
+            <p>Unlimited workflows, chat, mappings, and analytics.</p>
+          </article>
+          <article class="card">
+            <h3>Enterprise</h3>
+            <p class="price">Custom</p>
+            <p>Dedicated workspace, governance, and support.</p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer" id="contact">
+      <div class="container footer-inner">
+        <p>FlowFast © 2026</p>
+        <a href="mailto:hello@flowfast.ai">hello@flowfast.ai</a>
+      </div>
+    </footer>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

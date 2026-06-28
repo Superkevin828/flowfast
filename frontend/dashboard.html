@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlowFast Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="dashboard-shell">
+      <aside class="sidebar">
+        <a class="brand" href="/">FlowFast</a>
+        <a class="active" href="/dashboard">Dashboard</a>
+        <a href="/chat">AI Chat</a>
+        <a href="/">Landing</a>
+        <button class="btn secondary full" id="logoutButton">Logout</button>
+      </aside>
+      <main class="main">
+        <div class="topbar">
+          <div>
+            <h2>Operations workspace</h2>
+            <p class="muted">Welcome, <span id="userName">operator</span>.</p>
+          </div>
+          <button class="theme-toggle" id="themeToggle">☾</button>
+        </div>
+
+        <section class="panel">
+          <h3>Upload and process</h3>
+          <form id="uploadForm" class="upload-box">
+            <input id="fileInput" type="file" name="file" required />
+            <button class="btn primary">Process file</button>
+          </form>
+          <p id="uploadStatus" class="muted">Upload PDFs, images, CSVs, JSON, and text files for AI-backed extraction.</p>
+        </section>
+
+        <section class="panel">
+          <h3>Recent files</h3>
+          <div class="list" id="filesList"></div>
+        </section>
+
+        <section class="panel">
+          <h3>Smart mappings</h3>
+          <form id="mappingForm" class="upload-box">
+            <input type="text" name="sourceField" placeholder="Source field" required />
+            <input type="text" name="targetField" placeholder="Destination field" required />
+            <input type="text" name="description" placeholder="Optional description" />
+            <button class="btn primary">Save mapping</button>
+          </form>
+          <div class="list" id="mappingList"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
