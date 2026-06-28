@@ -1,22 +1,33 @@
-const { ClaudeProvider, HeuristicProvider } = require('./provider');
+const { ClaudeProvider, FreeAIProvider, HeuristicProvider } = require('./provider');
 
 class AIService {
   constructor() {
     if (process.env.ANTHROPIC_API_KEY) {
-      this.provider = new ClaudeProvider();
-      console.log('[AI] Using ClaudeProvider (Anthropic API)');
+      this.claudeProvider = new ClaudeProvider();
+      console.log('[AI] ClaudeProvider ready (paid users)');
     } else {
-      this.provider = new HeuristicProvider();
-      console.warn('[AI] ANTHROPIC_API_KEY not set — using HeuristicProvider (set the env var to enable Claude)');
+      this.claudeProvider = null;
+      console.warn('[AI] ANTHROPIC_API_KEY not set — paid users will fall back to FreeAI');
     }
+    this.freeProvider = new FreeAIProvider();
+    console.log('[AI] FreeAIProvider ready (free users)');
   }
 
-  async extractDocumentData(payload) {
-    return this.provider.extractDocumentData(payload);
+  // plan: 'free' | 'starter' | 'pro'
+  async extractDocumentData(payload, plan = 'free') {
+    const provider = this._pick(plan);
+    return provider.extractDocumentData(payload);
   }
 
-  async answerQuery(query, files) {
-    return this.provider.answerQuery(query, files);
+  async answerQuery(query, files, plan = 'free') {
+    const provider = this._pick(plan);
+    return provider.answerQuery(query, files);
+  }
+
+  _pick(plan) {
+    const isPaid = plan === 'starter' || plan === 'pro';
+    if (isPaid && this.claudeProvider) return this.claudeProvider;
+    return this.freeProvider;
   }
 }
 

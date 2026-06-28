@@ -151,7 +151,7 @@ label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--muted)
 }
 [data-theme="light"] .navbar { background: rgba(240,242,247,0.9); }
 .navbar .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.06em; color: var(--text); display: flex; align-items: center; gap: 0.5rem; }
-.navbar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-g); }
+.navbar .brand .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
 .navbar-links { display: flex; align-items: center; gap: 0.25rem; }
 .navbar-links a { padding: 0.4rem 0.75rem; border-radius: var(--radius); color: var(--muted); font-size: 0.875rem; font-weight: 500; transition: all 0.15s; }
 .navbar-links a:hover, .navbar-links a.active { color: var(--text); background: var(--surface); }
@@ -173,7 +173,7 @@ label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--muted)
   position: sticky; top: 0; height: 100vh; overflow-y: auto;
 }
 .sidebar .brand { padding: 0.25rem 0.5rem 1rem; font-size: 1rem; font-weight: 800; letter-spacing: 0.06em; display: flex; align-items: center; gap: 0.5rem; }
-.sidebar .brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-g); flex-shrink: 0; }
+.sidebar .brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
 .sidebar .nav-section { font-size: 0.68rem; font-weight: 600; color: var(--muted2); letter-spacing: 0.08em; text-transform: uppercase; padding: 0.75rem 0.5rem 0.25rem; }
 .sidebar a, .sidebar button.nav-item {
   display: flex; align-items: center; gap: 0.6rem; padding: 0.55rem 0.75rem;
@@ -267,7 +267,7 @@ label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--muted)
 /* ─── Landing page ───────────────────────────────────────────────────────── */
 .landing-nav { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 2rem; border-bottom: 1px solid var(--border); }
 .landing-nav .brand { font-size: 1.1rem; font-weight: 800; letter-spacing: 0.06em; display: flex; align-items: center; gap: 0.5rem; }
-.landing-nav .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-g); }
+.landing-nav .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
 .hero-section { min-height: calc(100vh - 64px); display: flex; align-items: center; background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(79,124,255,0.15), transparent); }
 .hero-grid { display: grid; grid-template-columns: 1fr 420px; gap: 3rem; align-items: center; padding: 4rem 0; }
 .hero-eyebrow { display: inline-flex; align-items: center; gap: 0.4rem; background: rgba(79,124,255,0.1); border: 1px solid rgba(79,124,255,0.25); color: var(--accent); padding: 0.3rem 0.8rem; border-radius: 99px; font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; margin-bottom: 1.25rem; }
@@ -331,6 +331,7 @@ label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--muted)
 .gap-3 { gap: 0.75rem; }
 .mt-1 { margin-top: 0.25rem; }
 .hidden { display: none !important; }
+.visible-flex { display: flex !important; }
 .divider { height: 1px; background: var(--border); }
 .spinner-sm { width: 14px; height: 14px; border: 2px solid var(--border2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; flex-shrink: 0; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -347,3 +348,18 @@ label { display: block; font-size: 0.8rem; font-weight: 500; color: var(--muted)
   .page-content { padding: 1rem; }
   .page-header { padding: 1rem; }
 }
+/* ── Plan banner (chat page) ─────────────────────────────────────────── */
+.plan-banner {
+  padding: 0.6rem 1.5rem;
+  background: rgba(79,124,255,0.07);
+  border-bottom: 1px solid rgba(79,124,255,0.18);
+  font-size: 0.8rem;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.plan-banner:empty { display: none; }
+
+/* ── Chat avatars by AI mode ─────────────────────────────────────────── */
+.avatar-claude { background: rgba(79,124,255,0.2); color: var(--accent); font-size: 0.65rem; }
+.avatar-free   { background: rgba(34,211,160,0.15); color: var(--green); font-size: 0.65rem; }
+.avatar-user   { background: rgba(245,166,35,0.15); color: var(--yellow); }

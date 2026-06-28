@@ -115,63 +115,8 @@
     </div>
   </footer>
 
-  <script>
-    const TOKEN_KEY = 'flowfast-token';
-    function getToken() { return localStorage.getItem(TOKEN_KEY); }
-
-    async function apiFetch(path, opts = {}) {
-      const headers = { 'Content-Type': 'application/json' };
-      const token = getToken();
-      if (token) headers.Authorization = 'Bearer ' + token;
-      const res = await fetch('/api' + path, { ...opts, headers });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Request failed');
-      return data;
-    }
-
-    async function loadPlan() {
-      if (!getToken()) return;
-      try {
-        const { subscription } = await apiFetch('/payments/subscription');
-        const plan = subscription?.plan || 'free';
-        if (plan !== 'free') {
-          document.getElementById('currentPlanRow').style.display = 'block';
-          const badge = document.getElementById('currentPlanBadge');
-          badge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
-          badge.className = 'badge ' + (plan === 'pro' ? 'blue' : 'green');
-          const activeBtn = document.getElementById('btn' + plan.charAt(0).toUpperCase() + plan.slice(1));
-          if (activeBtn) { activeBtn.textContent = '✓ Current plan'; activeBtn.disabled = true; }
-        }
-      } catch {}
-    }
-
-    async function subscribe(plan) {
-      if (!getToken()) { window.location.href = '/'; return; }
-      const id = 'btn' + plan.charAt(0).toUpperCase() + plan.slice(1);
-      const btn = document.getElementById(id);
-      const msg = document.getElementById('statusMsg');
-      btn.disabled = true;
-      btn.innerHTML = '<span style="display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.7s linear infinite;margin-right:0.4rem;"></span>Redirecting to Pesapal…';
-      msg.textContent = '';
-      try {
-        const data = await apiFetch('/payments/initiate', { method: 'POST', body: JSON.stringify({ plan }) });
-        window.location.href = data.redirectUrl;
-      } catch (err) {
-        msg.textContent = '⚠️ ' + err.message;
-        msg.style.color = 'var(--red)';
-        btn.disabled = false;
-        btn.textContent = plan === 'starter' ? 'Subscribe · UGX 29,000 / mo' : 'Subscribe · UGX 89,000 / mo';
-      }
-    }
-
-    document.getElementById('themeToggle').addEventListener('click', () => {
-      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('flowfast-theme', next);
-    });
-    document.documentElement.setAttribute('data-theme', localStorage.getItem('flowfast-theme') || 'dark');
-
-    loadPlan();
-  </script>
+  
+  <script src="/app.js"></script>
+  <script src="/pricing.js"></script>
 </body>
 </html>

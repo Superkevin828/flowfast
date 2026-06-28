@@ -10,12 +10,12 @@
   <div class="chat-layout">
     <!-- SIDEBAR -->
     <aside class="chat-sidebar">
-      <a href="/" class="brand" style="padding:0.25rem 0.5rem 1rem;display:flex;align-items:center;gap:0.5rem;"><span class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--accent-g);flex-shrink:0;"></span>FlowFast</a>
+      <a href="/" class="brand" style="padding:0.25rem 0.5rem 1rem;display:flex;align-items:center;gap:0.5rem;"><span class="dot" style="width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0;"></span>FlowFast</a>
       <button class="btn primary full" id="newChatBtn" style="margin-bottom:0.75rem;border-radius:var(--radius);font-size:0.82rem;">+ New chat</button>
       <div style="font-size:0.68rem;font-weight:600;color:var(--muted2);letter-spacing:0.08em;text-transform:uppercase;padding:0 0.5rem 0.5rem;">Recent chats</div>
       <div id="chatList" style="flex:1;display:flex;flex-direction:column;gap:0.2rem;overflow-y:auto;"></div>
       <div style="margin-top:auto;padding-top:0.75rem;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:0.25rem;">
-        <a href="/dashboard" style="display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0.75rem;border-radius:var(--radius);color:var(--muted);font-size:0.82rem;transition:all 0.15s;" onmouseover="this.style.color='var(--text)';this.style.background='var(--surface)'" onmouseout="this.style.color='var(--muted)';this.style.background='transparent'">← Dashboard</a>
+        <a href="/dashboard" style="display:flex;align-items:center;gap:0.5rem;padding:0.45rem 0.75rem;border-radius:var(--radius);color:var(--muted);font-size:0.82rem;transition:all 0.15s;" onmouseover="this.style.color='var(--text)';this.style.background='var(--surface)'" onmouseout="this.style.color='var(--muted)';this.style.background='transparent'">&#8592; Dashboard</a>
       </div>
     </aside>
 
@@ -27,15 +27,18 @@
           <div id="chatMeta" style="font-size:0.75rem;color:var(--muted);margin-top:0.1rem;">Ask questions about your uploaded documents</div>
         </div>
         <div style="display:flex;align-items:center;gap:0.5rem;">
-          <a href="/dashboard" class="btn text-sm" style="font-size:0.8rem;">📁 Documents</a>
-          <button class="theme-btn" id="themeToggle">◐</button>
+          <a href="/dashboard" class="btn text-sm" style="font-size:0.8rem;">&#128193; Documents</a>
+          <button class="theme-btn" id="themeToggle">&#9680;</button>
         </div>
       </div>
+
+      <!-- PLAN BANNER (shown for free users) -->
+      <div id="planBanner" class="plan-banner"></div>
 
       <!-- MESSAGES -->
       <div class="messages-area" id="messages">
         <div class="empty-state" id="emptyState">
-          <div class="es-icon">🤖</div>
+          <div class="es-icon">&#129302;</div>
           <h3>FlowFast AI</h3>
           <p>Start a new chat or select an existing one. I can answer questions about your uploaded documents.</p>
           <div style="display:flex;flex-wrap:wrap;gap:0.5rem;justify-content:center;margin-top:0.5rem;">
@@ -48,153 +51,20 @@
 
       <!-- INPUT BAR -->
       <div class="chat-input-bar">
-        <div id="activeChatId" data-id=""></div>
         <div class="chat-input-wrap">
           <textarea id="chatInput" placeholder="Ask about your documents… (Enter to send, Shift+Enter for new line)" rows="1"></textarea>
           <button class="send-btn" id="sendBtn" title="Send message">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
           </button>
         </div>
-        <div style="text-align:center;margin-top:0.4rem;"><span class="text-xs muted">FlowFast AI · Powered by Claude</span></div>
+        <div style="text-align:center;margin-top:0.4rem;" id="chatFooterLabel">
+          <span class="text-xs muted">FlowFast AI</span>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="/app.js"></script>
-  <script>
-    const TOKEN_KEY = 'flowfast-token';
-    function getToken() { return localStorage.getItem(TOKEN_KEY); }
-    let activeChatId = null;
-
-    async function apiFetch(path, opts = {}) {
-      const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
-      const token = getToken();
-      if (token) headers.Authorization = 'Bearer ' + token;
-      const res = await fetch('/api' + path, { ...opts, headers });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Request failed');
-      return data;
-    }
-
-    function insertPrompt(text) {
-      document.getElementById('chatInput').value = text;
-      document.getElementById('chatInput').focus();
-    }
-
-    function appendMessage(role, content) {
-      const area = document.getElementById('messages');
-      document.getElementById('emptyState')?.remove();
-      const initials = role === 'assistant' ? 'AI' : 'You';
-      const div = document.createElement('div');
-      div.className = 'msg ' + role;
-      div.innerHTML = `<div class="msg-avatar">${initials}</div><div class="msg-bubble">${escapeHtml(content)}</div>`;
-      area.appendChild(div);
-      area.scrollTop = area.scrollHeight;
-      return div;
-    }
-
-    function appendTyping() {
-      const area = document.getElementById('messages');
-      const div = document.createElement('div');
-      div.className = 'msg assistant';
-      div.id = 'typingIndicator';
-      div.innerHTML = '<div class="msg-avatar">AI</div><div class="msg-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>';
-      area.appendChild(div);
-      area.scrollTop = area.scrollHeight;
-    }
-
-    function escapeHtml(s) {
-      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
-    }
-
-    async function sendMessage() {
-      const input = document.getElementById('chatInput');
-      const message = input.value.trim();
-      if (!message || !activeChatId) return;
-      input.value = ''; input.style.height = 'auto';
-      document.getElementById('sendBtn').disabled = true;
-      appendMessage('user', message);
-      appendTyping();
-      try {
-        const data = await apiFetch('/chats/' + activeChatId + '/messages', { method: 'POST', body: JSON.stringify({ message }) });
-        document.getElementById('typingIndicator')?.remove();
-        appendMessage('assistant', data.reply.answer || 'No response.');
-      } catch (err) {
-        document.getElementById('typingIndicator')?.remove();
-        appendMessage('assistant', '⚠️ Error: ' + err.message);
-      } finally {
-        document.getElementById('sendBtn').disabled = false;
-        input.focus();
-      }
-    }
-
-    async function loadChats() {
-      if (!getToken()) { window.location.href = '/'; return; }
-      try {
-        const { chats } = await apiFetch('/chats');
-        renderChatList(chats || []);
-        if (chats?.length) selectChat(chats[0]);
-      } catch { window.location.href = '/'; }
-    }
-
-    function renderChatList(chats) {
-      const el = document.getElementById('chatList');
-      if (!chats.length) { el.innerHTML = '<div class="text-xs muted" style="padding:0.5rem;">No chats yet</div>'; return; }
-      el.innerHTML = chats.map(c => `<button class="chat-item ${c._id === activeChatId ? 'active' : ''}" data-id="${c._id}">${c.title || 'Conversation'}</button>`).join('');
-      el.querySelectorAll('.chat-item').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const { chats } = await apiFetch('/chats');
-          const chat = chats.find(c => c._id === btn.dataset.id);
-          if (chat) selectChat(chat);
-        });
-      });
-    }
-
-    function selectChat(chat) {
-      activeChatId = chat._id;
-      document.getElementById('chatTitle').textContent = chat.title || 'Conversation';
-      document.getElementById('chatMeta').textContent = chat.lastMessage ? 'Last: ' + chat.lastMessage : 'Ask anything about your documents';
-      const area = document.getElementById('messages');
-      area.innerHTML = '';
-      if (chat.messages?.length) {
-        chat.messages.forEach(m => appendMessage(m.role, m.content));
-      } else {
-        area.innerHTML = '<div class="empty-state"><div class="es-icon">💬</div><h3>New conversation</h3><p>Ask me anything about your uploaded documents.</p></div>';
-      }
-      document.querySelectorAll('.chat-item').forEach(b => b.classList.toggle('active', b.dataset.id === activeChatId));
-    }
-
-    document.getElementById('newChatBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('newChatBtn');
-      btn.disabled = true; btn.textContent = 'Creating…';
-      try {
-        const { chat } = await apiFetch('/chats', { method: 'POST', body: JSON.stringify({ title: 'New conversation' }) });
-        selectChat(chat);
-        const { chats } = await apiFetch('/chats');
-        renderChatList(chats || []);
-      } catch {}
-      btn.disabled = false; btn.textContent = '+ New chat';
-    });
-
-    document.getElementById('sendBtn').addEventListener('click', sendMessage);
-    document.getElementById('chatInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-    });
-    document.getElementById('chatInput').addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = Math.min(this.scrollHeight, 160) + 'px';
-    });
-
-    document.getElementById('themeToggle').addEventListener('click', () => {
-      const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', next);
-      localStorage.setItem('flowfast-theme', next);
-    });
-
-    const savedTheme = localStorage.getItem('flowfast-theme') || 'dark';
-    document.documentElement.setAttribute('data-theme', savedTheme);
-
-    loadChats();
-  </script>
+  <script src="/chat.js"></script>
 </body>
 </html>

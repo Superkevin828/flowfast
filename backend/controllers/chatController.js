@@ -1,6 +1,17 @@
 const ChatSession = require('../models/ChatSession');
 const FileItem = require('../models/FileItem');
+const Subscription = require('../models/Subscription');
 const aiService = require('../ai');
+
+/* Resolve the user's current plan — returns 'free' | 'starter' | 'pro' */
+async function getUserPlan(userId) {
+  try {
+    const sub = await Subscription.findOne({ userId, status: 'active' }).sort({ createdAt: -1 });
+    return sub?.plan || 'free';
+  } catch {
+    return 'free';
+  }
+}
 
 async function listChats(req, res) {
   const chats = await ChatSession.find({ userId: req.user.id }).sort({ updatedAt: -1 });
@@ -27,12 +38,22 @@ async function sendMessage(req, res) {
     return res.status(404).json({ error: 'Chat not found' });
   }
 
-  const files = await FileItem.find({ userId: req.user.id });
-  const reply = await aiService.answerQuery(message, files);
+  const [files, plan] = await Promise.all([
+    FileItem.find({ userId: req.user.id }),
+    getUserPlan(req.user.id)
+  ]);
+
+  const reply = await aiService.answerQuery(message, files, plan);
+
+  // Persist message to chat history
+  chat.messages = chat.messages || [];
+  chat.messages.push({ role: 'user', content: message });
+  chat.messages.push({ role: 'assistant', content: reply.answer });
   chat.lastMessage = message;
   chat.updatedAt = new Date();
   await chat.save();
-  return res.json({ chat, reply });
+
+  return res.json({ chat, reply, plan });
 }
 
 module.exports = { listChats, createChat, sendMessage };

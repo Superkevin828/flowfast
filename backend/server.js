@@ -6,13 +6,13 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const { connectDatabase } = require('./config/database');
-
+ 
 const authRoutes = require('./routes/auth');
 const uploadRoutes = require('./routes/uploads');
 const chatRoutes = require('./routes/chats');
 const mappingRoutes = require('./routes/mappings');
 const healthRoutes = require('./routes/health');
-
+const paymentRoutes = require('./routes/payments');
 const app = express();
 const port = process.env.PORT || 8000;
 
@@ -35,7 +35,7 @@ app.use('/api/uploads', uploadRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/mappings', mappingRoutes);
 app.use('/api/health', healthRoutes);
-
+app.use('/api/payments', paymentRoutes);
 app.use(express.static(path.join(__dirname, '../frontend')));
 
 app.get('/', (req, res) => {

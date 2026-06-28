@@ -33,7 +33,7 @@
           <div class="hero-stats">
             <div class="stat"><div class="val">10+</div><div class="lbl">File formats</div></div>
             <div class="stat"><div class="val">92%</div><div class="lbl">Extraction accuracy</div></div>
-            <div class="stat"><div class="val">< 10s</div><div class="lbl">Per document</div></div>
+            <div class="stat"><div class="val">&lt; 10s</div><div class="lbl">Per document</div></div>
           </div>
         </div>
 
@@ -44,38 +44,40 @@
             <button class="auth-tab" data-target="register">Create account</button>
           </div>
 
-          <div id="loginForm" class="auth-form-inner">
+          <!-- LOGIN FORM -->
+          <form id="loginForm" class="auth-form-inner" novalidate>
             <p class="text-sm muted" style="margin-bottom:0.25rem;">Welcome back</p>
             <div id="loginError" class="auth-error"></div>
             <div class="field">
-              <label>Email</label>
-              <input type="email" id="loginEmail" placeholder="you@example.com" required />
+              <label for="loginEmail">Email</label>
+              <input type="email" id="loginEmail" name="email" placeholder="you@example.com" autocomplete="email" required />
             </div>
             <div class="field">
-              <label>Password</label>
-              <input type="password" id="loginPassword" placeholder="••••••••" required />
+              <label for="loginPassword">Password</label>
+              <input type="password" id="loginPassword" name="password" placeholder="••••••••" autocomplete="current-password" required />
             </div>
-            <button class="btn primary full" id="loginBtn">Sign in</button>
+            <button type="submit" class="btn primary full" id="loginBtn">Sign in</button>
             <p class="text-xs muted" style="text-align:center;">Don't have an account? Click "Create account" above.</p>
-          </div>
+          </form>
 
-          <div id="registerForm" class="auth-form-inner hidden">
+          <!-- REGISTER FORM -->
+          <form id="registerForm" class="auth-form-inner hidden" novalidate>
             <p class="text-sm muted" style="margin-bottom:0.25rem;">Start for free — no card needed</p>
             <div id="registerError" class="auth-error"></div>
             <div class="field">
-              <label>Full name</label>
-              <input type="text" id="regName" placeholder="Jane Mukasa" required />
+              <label for="regName">Full name</label>
+              <input type="text" id="regName" name="name" placeholder="Jane Mukasa" autocomplete="name" required />
             </div>
             <div class="field">
-              <label>Email</label>
-              <input type="email" id="regEmail" placeholder="you@example.com" required />
+              <label for="regEmail">Email</label>
+              <input type="email" id="regEmail" name="email" placeholder="you@example.com" autocomplete="email" required />
             </div>
             <div class="field">
-              <label>Password</label>
-              <input type="password" id="regPassword" placeholder="Min 6 characters" required />
+              <label for="regPassword">Password</label>
+              <input type="password" id="regPassword" name="password" placeholder="Min 6 characters" autocomplete="new-password" required />
             </div>
-            <button class="btn primary full" id="registerBtn">Create account →</button>
-          </div>
+            <button type="submit" class="btn primary full" id="registerBtn">Create account →</button>
+          </form>
         </div>
       </div>
     </div>
@@ -116,72 +118,6 @@
   </footer>
 
   <script src="/app.js"></script>
-  <script>
-    // Auth tab switching
-    document.querySelectorAll('.auth-tab').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-        document.querySelectorAll('.auth-form-inner').forEach(f => f.classList.add('hidden'));
-        document.getElementById(tab.dataset.target + 'Form').classList.remove('hidden');
-      });
-    });
-
-    async function authAction(email, password, name, isRegister) {
-      const path = isRegister ? '/auth/register' : '/auth/login';
-      const body = isRegister ? { name, email, password } : { email, password };
-      const res = await fetch('/api' + path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || 'Authentication failed');
-      return data;
-    }
-
-    document.getElementById('loginBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('loginBtn');
-      const errEl = document.getElementById('loginError');
-      errEl.classList.remove('show');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner-sm"></span> Signing in…';
-      try {
-        const data = await authAction(
-          document.getElementById('loginEmail').value,
-          document.getElementById('loginPassword').value,
-          null, false
-        );
-        localStorage.setItem('flowfast-token', data.token);
-        window.location.href = '/dashboard';
-      } catch (err) {
-        errEl.textContent = err.message; errEl.classList.add('show');
-        btn.disabled = false; btn.textContent = 'Sign in';
-      }
-    });
-
-    document.getElementById('registerBtn').addEventListener('click', async () => {
-      const btn = document.getElementById('registerBtn');
-      const errEl = document.getElementById('registerError');
-      errEl.classList.remove('show');
-      btn.disabled = true; btn.innerHTML = '<span class="spinner-sm"></span> Creating account…';
-      try {
-        const data = await authAction(
-          document.getElementById('regEmail').value,
-          document.getElementById('regPassword').value,
-          document.getElementById('regName').value,
-          true
-        );
-        localStorage.setItem('flowfast-token', data.token);
-        window.location.href = '/dashboard';
-      } catch (err) {
-        errEl.textContent = err.message; errEl.classList.add('show');
-        btn.disabled = false; btn.textContent = 'Create account →';
-      }
-    });
-
-    // Allow Enter key
-    ['loginEmail','loginPassword'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('loginBtn').click(); });
-    });
-    ['regName','regEmail','regPassword'].forEach(id => {
-      document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('registerBtn').click(); });
-    });
-  </script>
+  <script src="/index.js"></script>
 </body>
 </html>
