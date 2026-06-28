@@ -1,144 +1,87 @@
-class ProviderAdapter {
-  async extractDocumentData() {
-    throw new Error('Provider must implement extractDocumentData');
-  }
+const Anthropic = require('@anthropic-ai/sdk');
 
-  async answerQuery() {
-    throw new Error('Provider must implement answerQuery');
-  }
+class ProviderAdapter {
+  async extractDocumentData() { throw new Error('Provider must implement extractDocumentData'); }
+  async answerQuery() { throw new Error('Provider must implement answerQuery'); }
 }
 
-class HeuristicProvider extends ProviderAdapter {
-  async extractDocumentData({ fileName, rawText, contentType }) {
-    const text = (rawText || '').trim();
-    const lower = text.toLowerCase();
+class ClaudeProvider extends ProviderAdapter {
+  constructor() {
+    super();
+    this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
 
-    const inferredType = this.detectDocumentType(lower, fileName);
-    const fields = this.extractFields(text);
-    const cleaned = this.cleanData(fields);
+  async extractDocumentData({ fileName, rawText, contentType }) {
+    const prompt = `You are a document extraction assistant. Extract structured data from the following document content and return ONLY a JSON object (no markdown, no backticks) with these fields where found: documentType, customerName, vendorName, email, phone, invoiceNumber, date, dueDate, total, amount, description, summary.
+
+File name: ${fileName}
+Content type: ${contentType}
+Content:
+${rawText || '(no text extracted)'}`;
+
+    const response = await this.client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      messages: [{ role: 'user', content: prompt }]
+    });
+
+    const text = response.content[0].text.trim();
+    let fields = {};
+    try {
+      fields = JSON.parse(text.replace(/```json|```/g, '').trim());
+    } catch {
+      fields = { summary: text };
+    }
 
     return {
-      documentType: inferredType,
-      confidence: inferredType === 'unknown' ? 0.58 : 0.84,
+      documentType: fields.documentType || 'Unknown',
+      confidence: 0.92,
       fields,
-      cleaned,
-      summary: `Detected ${inferredType} fields from ${fileName}`
+      cleaned: fields,
+      summary: fields.summary || `Extracted data from ${fileName}`
     };
   }
 
   async answerQuery(query, files) {
-    const lowerQuery = query.toLowerCase();
-    const fileSummaries = files.map((file) => ({
-      ...file.structuredData,
-      fileName: file.originalName || file.filename || 'document',
-      documentType: file.structuredData?.documentType || this.detectDocumentType(lowerQuery, file.originalName || file.filename || 'document'),
-      extractedText: file.extractedText || ''
-    }));
+    const fileContext = files.map((f) => {
+      const data = f.structuredData || {};
+      return `File: ${f.originalName || f.filename}\nExtracted data: ${JSON.stringify(data)}\nText preview: ${(f.extractedText || '').slice(0, 800)}`;
+    }).join('\n\n---\n\n');
 
-    if (!fileSummaries.length) {
-      return {
-        answer: 'Upload an invoice, contract, receipt, report, or form and I can analyze it for your office workflow.',
-        sources: 0,
-        mode: 'heuristic'
-      };
-    }
+    const systemPrompt = `You are FlowFast AI, a business intelligence assistant for SMEs in Uganda and East Africa. 
+You help users understand their business documents, cash flow, invoices, and financial data.
+Be concise, practical, and helpful. Reference specific data from the documents when answering.
+${files.length === 0 ? 'No documents uploaded yet — guide the user to upload files first.' : `User has ${files.length} document(s) uploaded.`}`;
 
-    const amounts = fileSummaries.flatMap((entry) => [entry.total, entry.amount, entry.revenue]).filter(Boolean);
-    const names = fileSummaries.flatMap((entry) => [entry.customerName, entry.name, entry.fullName, entry.vendorName]).filter(Boolean);
-    const invoiceNumbers = fileSummaries.flatMap((entry) => [entry.invoiceNumber, entry.invoice_id]).filter(Boolean);
-    const emails = fileSummaries.flatMap((entry) => [entry.email]).filter(Boolean);
-    const dates = fileSummaries.flatMap((entry) => [entry.date, entry.dueDate]).filter(Boolean);
+    const userContent = files.length > 0
+      ? `Documents context:\n${fileContext}\n\nUser question: ${query}`
+      : query;
 
-    if (lowerQuery.includes('summary') || lowerQuery.includes('summarize') || lowerQuery.includes('overview')) {
-      const first = fileSummaries[0];
-      const summaryBits = [`I reviewed ${fileSummaries.length} office document(s).`, `Primary type: ${first.documentType || 'document'}.`];
-      if (first.total) summaryBits.push(`Estimated value: ${first.total}.`);
-      if (first.customerName) summaryBits.push(`Related party: ${first.customerName}.`);
-      if (first.email) summaryBits.push(`Contact: ${first.email}.`);
-      return { answer: summaryBits.join(' '), sources: fileSummaries.length, mode: 'heuristic' };
-    }
-
-    if (lowerQuery.includes('action') || lowerQuery.includes('next step') || lowerQuery.includes('follow up') || lowerQuery.includes('what should')) {
-      const actions = ['Review the document for approval.', 'Confirm the key contact and deadline.'];
-      if (invoiceNumbers.length) actions.push(`Check invoice ${invoiceNumbers[0]} for payment status.`);
-      if (amounts.length) actions.push(`Verify the amount of ${amounts[0]}.`);
-      if (dates.length) actions.push(`Follow up before ${dates[0]}.`);
-      return { answer: `Office workflow suggestion: ${actions.join(' ')}`, sources: fileSummaries.length, mode: 'heuristic' };
-    }
-
-    if (lowerQuery.includes('total') || lowerQuery.includes('revenue') || lowerQuery.includes('amount') || lowerQuery.includes('balance')) {
-      const total = amounts.reduce((sum, value) => sum + Number(value || 0), 0);
-      return { answer: `The detected financial value is ${total.toFixed(2)} across the available office documents.`, sources: fileSummaries.length, mode: 'heuristic' };
-    }
-
-    if (lowerQuery.includes('customer') || lowerQuery.includes('vendor') || lowerQuery.includes('name')) {
-      return { answer: `Relevant names found: ${names.join(', ') || 'No names detected'}.`, sources: fileSummaries.length, mode: 'heuristic' };
-    }
-
-    if (lowerQuery.includes('invoice') || lowerQuery.includes('invoice number')) {
-      return { answer: `Invoice numbers detected: ${invoiceNumbers.join(', ') || 'None detected'}.`, sources: fileSummaries.length, mode: 'heuristic' };
-    }
-
-    if (lowerQuery.includes('contact') || lowerQuery.includes('email') || lowerQuery.includes('phone')) {
-      return { answer: `Contact details found: ${emails.join(', ') || 'No contact details detected'}.`, sources: fileSummaries.length, mode: 'heuristic' };
-    }
-
-    if (lowerQuery.includes('due') || lowerQuery.includes('deadline') || lowerQuery.includes('date')) {
-      return { answer: `Important dates detected: ${dates.join(', ') || 'No dates detected'}.`, sources: fileSummaries.length, mode: 'heuristic' };
-    }
+    const response = await this.client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userContent }]
+    });
 
     return {
-      answer: `I reviewed ${fileSummaries.length} office document(s) and can help with summaries, amounts, contacts, invoice numbers, due dates, and next steps.`,
-      sources: fileSummaries.length,
-      mode: 'heuristic'
-    };
-  }
-
-  detectDocumentType(lower, fileName) {
-    if (lower.includes('invoice') || fileName.includes('invoice')) return 'Invoice';
-    if (lower.includes('receipt') || fileName.includes('receipt')) return 'Receipt';
-    if (lower.includes('bank') || lower.includes('statement')) return 'Bank Statement';
-    if (lower.includes('contract')) return 'Contract';
-    if (lower.includes('resume')) return 'Resume';
-    if (lower.includes('passport')) return 'Passport';
-    if (lower.includes('tax')) return 'Tax Form';
-    return 'Unknown';
-  }
-
-  extractFields(text) {
-    const fields = {};
-    const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
-    const phoneMatch = text.match(/\+?[0-9\s()-]{7,}/);
-    const dateMatch = text.match(/\b(\d{4}-\d{2}-\d{2}|\d{2}\/\d{2}\/\d{4}|\d{1,2} [A-Za-z]+ \d{4})\b/);
-    const amountMatch = text.match(/\$?\d{1,3}(?:,\d{3})*(?:\.\d{2})?/);
-
-    if (emailMatch) fields.email = emailMatch[0];
-    if (phoneMatch) fields.phone = phoneMatch[0].trim();
-    if (dateMatch) fields.date = dateMatch[0];
-    if (amountMatch) fields.total = Number(amountMatch[0].replace(/[$,]/g, ''));
-
-    const nameMatch = text.match(/([A-Z][a-z]+\s+[A-Z][a-z]+)/);
-    if (nameMatch) fields.customerName = nameMatch[1];
-
-    const invoiceMatch = text.match(/invoice[^\n]{0,20}(\d+)/i);
-    if (invoiceMatch) fields.invoiceNumber = invoiceMatch[1];
-
-    return fields;
-  }
-
-  cleanData(fields) {
-    return {
-      ...fields,
-      normalized: {
-        email: fields.email ? fields.email.toLowerCase() : null,
-        phone: fields.phone ? fields.phone.replace(/\s+/g, ' ') : null,
-        total: typeof fields.total === 'number' ? Number(fields.total.toFixed(2)) : null
-      }
+      answer: response.content[0].text,
+      sources: files.length,
+      mode: 'claude'
     };
   }
 }
 
-module.exports = {
-  ProviderAdapter,
-  HeuristicProvider
-};
+// Fallback heuristic provider (used if no API key)
+class HeuristicProvider extends ProviderAdapter {
+  async extractDocumentData({ fileName }) {
+    return { documentType: 'Unknown', confidence: 0.5, fields: {}, cleaned: {}, summary: `Uploaded ${fileName}` };
+  }
+
+  async answerQuery(query, files) {
+    if (!files.length) return { answer: 'Please upload a document first so I can help analyze it.', sources: 0, mode: 'heuristic' };
+    return { answer: `I reviewed ${files.length} document(s). Set ANTHROPIC_API_KEY to enable full AI responses.`, sources: files.length, mode: 'heuristic' };
+  }
+}
+
+module.exports = { ProviderAdapter, ClaudeProvider, HeuristicProvider };

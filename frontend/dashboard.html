@@ -5,6 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>FlowFast Dashboard</title>
     <link rel="stylesheet" href="/styles.css" />
+    <style>
+      .plan-badge { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0.75rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+      .plan-badge.free { background: #ffffff11; color: var(--muted); border: 1px solid var(--border); }
+      .plan-badge.starter { background: #3b82f622; color: #60a5fa; border: 1px solid #3b82f644; }
+      .plan-badge.pro { background: #8b5cf622; color: #a78bfa; border: 1px solid #8b5cf644; }
+      .upgrade-banner { background: linear-gradient(135deg, #8b5cf611, #3b82f611); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+      .upgrade-banner p { color: var(--muted); margin: 0; font-size: 0.9rem; }
+    </style>
   </head>
   <body>
     <div class="dashboard-shell">
@@ -12,6 +20,7 @@
         <a class="brand" href="/">FlowFast</a>
         <a class="active" href="/dashboard">Dashboard</a>
         <a href="/chat">AI Chat</a>
+        <a href="/pricing">Pricing</a>
         <a href="/">Landing</a>
         <button class="btn secondary full" id="logoutButton">Logout</button>
       </aside>
@@ -19,9 +28,18 @@
         <div class="topbar">
           <div>
             <h2>Operations workspace</h2>
-            <p class="muted">Welcome, <span id="userName">operator</span>.</p>
+            <p class="muted">Welcome, <span id="userName">operator</span>. &nbsp;<span id="planBadge" class="plan-badge free">Free</span></p>
           </div>
           <button class="theme-toggle" id="themeToggle">☾</button>
+        </div>
+
+        <!-- Upgrade banner (shown for free users) -->
+        <div class="upgrade-banner" id="upgradeBanner" style="display:none;">
+          <div>
+            <strong>Unlock Claude AI</strong>
+            <p>Upgrade to Starter or Pro for real AI-powered document extraction and smart chat.</p>
+          </div>
+          <a href="/pricing" class="btn primary">View Plans →</a>
         </div>
 
         <section class="panel">
@@ -52,5 +70,28 @@
     </div>
 
     <script src="/app.js"></script>
+    <script>
+      // Load subscription info and update UI
+      (async function loadSubscription() {
+        const token = localStorage.getItem('flowfast-token');
+        if (!token) return;
+        try {
+          const res = await fetch('/api/payments/subscription', {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          const { subscription } = await res.json();
+          const plan = subscription?.plan || 'free';
+          const badge = document.getElementById('planBadge');
+          if (badge) {
+            badge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+            badge.className = 'plan-badge ' + plan;
+          }
+          if (plan === 'free') {
+            const banner = document.getElementById('upgradeBanner');
+            if (banner) banner.style.display = 'flex';
+          }
+        } catch {}
+      })();
+    </script>
   </body>
 </html>

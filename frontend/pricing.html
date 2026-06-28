@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowFast — Pricing</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .pricing-page { min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; }
+    .pricing-header { text-align: center; margin-bottom: 3rem; }
+    .pricing-header h1 { font-size: 2.5rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .pricing-header p { color: var(--muted); font-size: 1.1rem; }
+    .plans-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.5rem; width: 100%; max-width: 900px; }
+    .plan-card { background: var(--surface); border: 1px solid var(--border); border-radius: 1rem; padding: 2rem; display: flex; flex-direction: column; gap: 1rem; transition: border-color 0.2s; }
+    .plan-card.featured { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+    .plan-card .badge { display: inline-block; background: var(--accent); color: #fff; font-size: 0.7rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.05em; width: fit-content; }
+    .plan-name { font-size: 1.3rem; font-weight: 700; }
+    .plan-price { font-size: 2.4rem; font-weight: 800; }
+    .plan-price span { font-size: 1rem; font-weight: 400; color: var(--muted); }
+    .plan-features { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+    .plan-features li::before { content: "✓  "; color: var(--accent); font-weight: 700; }
+    .plan-features li.no::before { content: "✗  "; color: var(--muted); }
+    .plan-features li.no { color: var(--muted); }
+    .plan-cta { margin-top: auto; }
+    .status-msg { text-align: center; margin-top: 1.5rem; color: var(--muted); font-size: 0.9rem; }
+    .current-badge { display: inline-block; background: #22c55e22; color: #22c55e; border: 1px solid #22c55e44; padding: 0.2rem 0.8rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <nav class="topnav" style="display:flex;align-items:center;justify-content:space-between;padding:1rem 2rem;border-bottom:1px solid var(--border);">
+    <a class="brand" href="/" style="font-weight:800;font-size:1.2rem;color:var(--fg);text-decoration:none;">FlowFast</a>
+    <div style="display:flex;gap:1rem;">
+      <a href="/dashboard" style="color:var(--muted);text-decoration:none;">Dashboard</a>
+      <a href="/chat" style="color:var(--muted);text-decoration:none;">AI Chat</a>
+    </div>
+  </nav>
+
+  <div class="pricing-page">
+    <div class="pricing-header">
+      <h1>Simple, Transparent Pricing</h1>
+      <p>Unlock the full power of FlowFast AI for your business</p>
+      <div id="currentPlanBanner" style="margin-top:1rem;display:none;">
+        Current plan: <span class="current-badge" id="currentPlanLabel"></span>
+      </div>
+    </div>
+
+    <div class="plans-grid">
+      <!-- Free -->
+      <div class="plan-card">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">UGX 0 <span>/ forever</span></div>
+        <ul class="plan-features">
+          <li>3 document uploads</li>
+          <li>Basic heuristic extraction</li>
+          <li>Limited chat queries</li>
+          <li class="no">Claude AI responses</li>
+          <li class="no">Priority support</li>
+        </ul>
+        <div class="plan-cta">
+          <button class="btn full" disabled>Current plan</button>
+        </div>
+      </div>
+
+      <!-- Starter -->
+      <div class="plan-card">
+        <div class="plan-name">Starter</div>
+        <div class="plan-price">UGX 29,000 <span>/ month</span></div>
+        <ul class="plan-features">
+          <li>50 document uploads / month</li>
+          <li>Claude AI document extraction</li>
+          <li>100 AI chat queries / month</li>
+          <li>Invoice &amp; receipt analysis</li>
+          <li class="no">Priority support</li>
+        </ul>
+        <div class="plan-cta">
+          <button class="btn primary full" onclick="subscribe('starter')" id="btn-starter">Subscribe — UGX 29,000</button>
+        </div>
+      </div>
+
+      <!-- Pro -->
+      <div class="plan-card featured">
+        <div class="badge">Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">UGX 89,000 <span>/ month</span></div>
+        <ul class="plan-features">
+          <li>Unlimited document uploads</li>
+          <li>Claude AI — full intelligence</li>
+          <li>Unlimited AI chat</li>
+          <li>Cash flow forecasting</li>
+          <li>Priority support</li>
+        </ul>
+        <div class="plan-cta">
+          <button class="btn primary full" onclick="subscribe('pro')" id="btn-pro">Subscribe — UGX 89,000</button>
+        </div>
+      </div>
+    </div>
+
+    <p class="status-msg" id="statusMsg"></p>
+  </div>
+
+  <script>
+    const TOKEN_KEY = 'flowfast-token';
+    function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+    async function api(path, options = {}) {
+      const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+      const token = getToken();
+      if (token) headers.Authorization = 'Bearer ' + token;
+      const res = await fetch('/api' + path, { ...options, headers });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    }
+
+    async function loadCurrentPlan() {
+      if (!getToken()) return;
+      try {
+        const { subscription } = await api('/payments/subscription');
+        if (subscription && subscription.plan !== 'free') {
+          document.getElementById('currentPlanBanner').style.display = 'block';
+          document.getElementById('currentPlanLabel').textContent = subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1);
+          const btn = document.getElementById('btn-' + subscription.plan);
+          if (btn) { btn.textContent = 'Active ✓'; btn.disabled = true; }
+        }
+      } catch {}
+    }
+
+    async function subscribe(plan) {
+      if (!getToken()) { window.location.href = '/'; return; }
+      const btn = document.getElementById('btn-' + plan);
+      btn.disabled = true;
+      btn.textContent = 'Redirecting to Pesapal…';
+      document.getElementById('statusMsg').textContent = '';
+      try {
+        const data = await api('/payments/initiate', { method: 'POST', body: JSON.stringify({ plan }) });
+        window.location.href = data.redirectUrl;
+      } catch (err) {
+        document.getElementById('statusMsg').textContent = 'Error: ' + err.message;
+        btn.disabled = false;
+        btn.textContent = plan === 'starter' ? 'Subscribe — UGX 29,000' : 'Subscribe — UGX 89,000';
+      }
+    }
+
+    loadCurrentPlan();
+  </script>
+</body>
+</html>
