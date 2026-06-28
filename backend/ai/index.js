@@ -19,9 +19,9 @@ class AIService {
     return provider.extractDocumentData(payload);
   }
 
-  async answerQuery(query, files, plan = 'free') {
+  async answerQuery(query, files, plan = 'free', history = []) {
     const provider = this._pick(plan);
-    return provider.answerQuery(query, files);
+    return provider.answerQuery(query, files, history);
   }
 
   _pick(plan) {

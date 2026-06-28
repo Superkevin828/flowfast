@@ -3,8 +3,41 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FlowFast — Dashboard</title>
+  <title>FlowFast — Analyst</title>
   <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .stat-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-lg); padding: 1.25rem 1.5rem;
+    }
+    .stat-card .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.4rem; }
+    .stat-card .stat-value { font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; line-height: 1; }
+    .stat-card .stat-sub { font-size: 0.75rem; color: var(--muted); margin-top: 0.3rem; }
+    .stat-card.accent-card { border-color: rgba(79,124,255,0.3); background: rgba(79,124,255,0.05); }
+    .stat-card.green-card { border-color: rgba(34,211,160,0.3); background: rgba(34,211,160,0.05); }
+
+    /* Token bar */
+    .token-bar-wrap { background: var(--bg3); border-radius: 99px; height: 8px; margin-top: 0.6rem; overflow: hidden; }
+    .token-bar-fill { height: 100%; border-radius: 99px; background: var(--accent-g); transition: width 0.8s ease; }
+    .token-bar-fill.warn { background: linear-gradient(90deg, var(--yellow), var(--red)); }
+
+    /* Plan badge large */
+    .plan-badge-lg {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      padding: 0.5rem 1.1rem; border-radius: 99px; font-weight: 600; font-size: 0.85rem;
+    }
+    .plan-badge-lg.free { background: rgba(107,122,150,0.15); color: var(--muted); border: 1px solid var(--border); }
+    .plan-badge-lg.starter { background: rgba(34,211,160,0.12); color: var(--green); border: 1px solid rgba(34,211,160,0.3); }
+    .plan-badge-lg.pro { background: rgba(79,124,255,0.12); color: var(--accent); border: 1px solid rgba(79,124,255,0.3); }
+
+    /* Upgrade CTA */
+    .upgrade-cta {
+      display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;
+      padding: 1.25rem 1.5rem; background: rgba(79,124,255,0.06);
+      border: 1px solid rgba(79,124,255,0.2); border-radius: var(--radius-lg); margin-bottom: 1.5rem;
+    }
+  </style>
 </head>
 <body>
   <div class="app-shell">
@@ -12,7 +45,7 @@
     <aside class="sidebar">
       <div class="brand"><span class="dot"></span>FlowFast</div>
       <div class="nav-section">Workspace</div>
-      <a href="/dashboard" class="active"><span class="icon">📁</span> Documents</a>
+      <a href="/dashboard" class="active"><span class="icon">📊</span> Analyst</a>
       <a href="/chat"><span class="icon">💬</span> AI Chat</a>
       <div class="nav-section">Account</div>
       <a href="/pricing"><span class="icon">⚡</span> Upgrade</a>
@@ -31,21 +64,54 @@
       <div class="page-header">
         <div style="display:flex;align-items:center;justify-content:space-between;">
           <div>
-            <h1>Documents</h1>
-            <p>Upload files and let Claude AI extract and structure your data.</p>
+            <h1>Analyst</h1>
+            <p>Your document intelligence overview.</p>
           </div>
           <button class="theme-btn" id="themeToggle" title="Toggle theme">◐</button>
         </div>
       </div>
 
       <div class="page-content">
-        <!-- UPGRADE BANNER -->
-        <div id="upgradeBanner" class="hidden" style="align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding:1rem 1.25rem;background:rgba(79,124,255,0.06);border:1px solid rgba(79,124,255,0.2);border-radius:var(--radius-lg);">
+
+        <!-- PLAN + UPGRADE -->
+        <div id="upgradeCta" class="upgrade-cta hidden">
           <div>
-            <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.2rem;">⚡ Unlock Claude AI extraction</div>
-            <p style="font-size:0.82rem;margin:0;">Free plan uses basic parsing. Upgrade to Starter or Pro for full AI-powered analysis.</p>
+            <div style="font-weight:600;font-size:0.9rem;margin-bottom:0.2rem;">⚡ You're on the Free plan</div>
+            <p style="font-size:0.82rem;margin:0;">Upgrade to unlock Claude AI extraction, higher token limits, and priority support.</p>
           </div>
           <a href="/pricing" class="btn primary" style="white-space:nowrap;">View plans →</a>
+        </div>
+
+        <!-- STATS GRID -->
+        <div class="stat-grid">
+          <div class="stat-card accent-card">
+            <div class="stat-label">Current plan</div>
+            <div style="margin-top:0.4rem;" id="planBadgeWrap">
+              <span class="plan-badge-lg free" id="planBadge">Free</span>
+            </div>
+            <div class="stat-sub" id="planSubtext">Basic Gemini AI</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Documents uploaded</div>
+            <div class="stat-value" id="statTotalDocs">—</div>
+            <div class="stat-sub" id="statDocsWeek">— this week</div>
+          </div>
+
+          <div class="stat-card green-card">
+            <div class="stat-label">AI conversations</div>
+            <div class="stat-value" id="statChats">—</div>
+            <div class="stat-sub">Total chat sessions</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Tokens used (est.)</div>
+            <div class="stat-value" id="statTokens">—</div>
+            <div class="stat-sub" id="statTokenLimit">— limit</div>
+            <div class="token-bar-wrap">
+              <div class="token-bar-fill" id="tokenBar" style="width:0%"></div>
+            </div>
+          </div>
         </div>
 
         <!-- UPLOAD PANEL -->
@@ -53,7 +119,7 @@
           <div class="panel-header">
             <div>
               <h3 style="margin:0;">Upload a document</h3>
-              <p style="font-size:0.8rem;margin-top:0.1rem;">Drag & drop or click to select. Claude AI will extract and structure the data.</p>
+              <p style="font-size:0.8rem;margin-top:0.1rem;">Drag & drop or click to select. You can also attach files directly in the <a href="/chat" style="color:var(--accent);">AI Chat</a>.</p>
             </div>
           </div>
           <div class="panel-body">
@@ -86,7 +152,7 @@
               <div class="empty-state" style="padding:2rem;">
                 <div class="es-icon">📂</div>
                 <h3>No documents yet</h3>
-                <p>Upload your first file above to get started.</p>
+                <p>Upload your first file above or attach one in the AI Chat.</p>
               </div>
             </div>
           </div>
@@ -113,12 +179,12 @@
             <p class="muted text-sm">No mappings saved yet.</p>
           </div>
         </div>
+
       </div>
     </main>
   </div>
 
   <script src="/app.js"></script>
   <script src="/dashboard.js"></script>
-  
 </body>
 </html>

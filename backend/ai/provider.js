@@ -6,7 +6,7 @@ class ProviderAdapter {
   async answerQuery() { throw new Error('Provider must implement answerQuery'); }
 }
 
-/* ── Claude (paid users) ─────────────────────────────────────────────── */
+/* ── Claude (paid users: starter / pro) ──────────────────────────────── */
 class ClaudeProvider extends ProviderAdapter {
   constructor() {
     super();
@@ -22,7 +22,7 @@ Content:
 ${rawText || '(no text extracted)'}`;
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -44,7 +44,7 @@ ${rawText || '(no text extracted)'}`;
     };
   }
 
-  async answerQuery(query, files) {
+  async answerQuery(query, files, history = []) {
     const fileContext = files.map((f) => {
       const data = f.structuredData || {};
       return `File: ${f.originalName || f.filename}\nExtracted data: ${JSON.stringify(data)}\nText preview: ${(f.extractedText || '').slice(0, 800)}`;
@@ -55,117 +55,133 @@ You help users understand their business documents, cash flow, invoices, and fin
 Be concise, practical, and helpful. Reference specific data from the documents when answering.
 ${files.length === 0 ? 'No documents uploaded yet — guide the user to upload files first.' : `User has ${files.length} document(s) uploaded.`}`;
 
-    const userContent = files.length > 0
-      ? `Documents context:\n${fileContext}\n\nUser question: ${query}`
-      : query;
+    const messages = [
+      ...history.map(h => ({ role: h.role, content: h.content })),
+      {
+        role: 'user',
+        content: files.length > 0
+          ? `Documents context:\n${fileContext}\n\nUser question: ${query}`
+          : query
+      }
+    ];
 
     const response = await this.client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1024,
       system: systemPrompt,
-      messages: [{ role: 'user', content: userContent }]
+      messages
     });
 
-    return {
-      answer: response.content[0].text,
-      sources: files.length,
-      mode: 'claude'
-    };
+    return { answer: response.content[0].text, sources: files.length, mode: 'claude' };
   }
 }
 
-/* ── Free AI via Hugging Face Inference API (no token required) ──────── */
+/* ── Free AI — Google Gemini (free tier, no cost) ────────────────────── */
+/*   Model: gemini-2.5-flash-lite (fast, free tier available)             */
+/*   API:   generativelanguage.googleapis.com — allowed on Render         */
+/*   Key:   GEMINI_API_KEY env var (get free at aistudio.google.com)      */
 class FreeAIProvider extends ProviderAdapter {
   constructor() {
     super();
-    // Uses the free serverless Inference API — no API key needed for small models
-    this.apiUrl = 'https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.3';
-    this.hfToken = process.env.HUGGINGFACE_TOKEN || null; // optional: set to raise rate limits
+    this.apiKey = process.env.GEMINI_API_KEY || null;
+    this.model = 'gemini-2.5-flash-lite'; // Free tier, fast, current as of June 2026
+    this.baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${this.model}:generateContent`;
+
+    if (this.apiKey) {
+      console.log(`[FreeAI] Gemini ${this.model} ready (free tier)`);
+    } else {
+      console.warn('[FreeAI] GEMINI_API_KEY not set — using smart heuristic fallback');
+    }
   }
 
   async extractDocumentData({ fileName }) {
-    // Free tier: basic extraction without AI
+    // Free tier: basic extraction without heavy AI
     return {
       documentType: 'Unknown',
       confidence: 0.5,
       fields: {},
       cleaned: {},
-      summary: `Uploaded ${fileName}. Upgrade to Starter or Pro for AI-powered extraction.`
+      summary: `Uploaded ${fileName}. Upgrade to Starter or Pro for full AI-powered extraction.`
     };
   }
 
-  async answerQuery(query, files) {
+  async answerQuery(query, files, history = []) {
+    if (this.apiKey) {
+      try {
+        return await this._geminiAnswer(query, files, history);
+      } catch (err) {
+        console.warn('[FreeAI] Gemini error, falling back to heuristic:', err.message);
+      }
+    }
+    return this._heuristicAnswer(query, files);
+  }
+
+  async _geminiAnswer(query, files, history) {
     const fileContext = files.length > 0
       ? files.map(f => {
           const d = f.structuredData || {};
-          const bits = [
-            d.documentType && `Type: ${d.documentType}`,
-            d.customerName && `Customer: ${d.customerName}`,
-            d.total && `Total: ${d.total}`,
-            d.date && `Date: ${d.date}`,
-            d.invoiceNumber && `Invoice #: ${d.invoiceNumber}`,
-          ].filter(Boolean).join(', ');
-          return `• ${f.originalName}${bits ? ' (' + bits + ')' : ''}`;
-        }).join('\n')
+          return `File: ${f.originalName}\nData: ${JSON.stringify(d)}\nText: ${(f.extractedText || '').slice(0, 400)}`;
+        }).join('\n---\n')
       : null;
 
-    const systemContext = `You are FlowFast Assistant, a helpful AI for small business owners in Uganda and East Africa. Be brief, friendly, and practical. Answer in 2-4 sentences max.`;
+    const systemInstruction = `You are FlowFast Assistant, a helpful AI for small business owners in Uganda and East Africa.
+Be brief, friendly, and practical. Answer in 3-5 sentences. Focus on actionable advice.
+${files.length > 0 ? `User has ${files.length} document(s).` : 'No documents uploaded yet.'}`;
 
-    const userPrompt = fileContext
-      ? `${systemContext}\n\nUser has these documents:\n${fileContext}\n\nQuestion: ${query}\n\nAnswer:`
-      : `${systemContext}\n\nQuestion: ${query}\n\nAnswer:`;
+    const userContent = fileContext
+      ? `Documents:\n${fileContext}\n\nQuestion: ${query}`
+      : query;
 
-    try {
-      const answer = await this._callHuggingFace(userPrompt);
-      return { answer, sources: files.length, mode: 'free' };
-    } catch (err) {
-      console.warn('[FreeAI] HuggingFace error, using heuristic fallback:', err.message);
-      return this._heuristicAnswer(query, files);
-    }
+    // Build Gemini-format contents array (roles: user / model)
+    const contents = [
+      ...history.map(h => ({
+        role: h.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: h.content }]
+      })),
+      { role: 'user', parts: [{ text: userContent }] }
+    ];
+
+    const payload = JSON.stringify({
+      system_instruction: { parts: [{ text: systemInstruction }] },
+      contents,
+      generationConfig: { maxOutputTokens: 512, temperature: 0.7 }
+    });
+
+    const answer = await this._callGemini(payload);
+    return { answer, sources: files.length, mode: 'free' };
   }
 
-  _callHuggingFace(prompt) {
+  _callGemini(payload) {
     return new Promise((resolve, reject) => {
-      const payload = JSON.stringify({
-        inputs: prompt,
-        parameters: {
-          max_new_tokens: 200,
-          temperature: 0.7,
-          return_full_text: false,
-          stop: ['\nUser:', '\nQuestion:']
+      const url = new URL(`${this.baseUrl}?key=${this.apiKey}`);
+      const options = {
+        hostname: url.hostname,
+        path: url.pathname + url.search,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
         }
+      };
+
+      const req = https.request(options, (res) => {
+        let data = '';
+        res.on('data', c => data += c);
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.error) {
+              return reject(new Error(`Gemini API error ${parsed.error.code}: ${parsed.error.message}`));
+            }
+            const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (!text) return reject(new Error('No text in Gemini response: ' + data.slice(0, 200)));
+            resolve(text.trim());
+          } catch (e) {
+            reject(e);
+          }
+        });
       });
 
-      const headers = {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(payload)
-      };
-      if (this.hfToken) headers['Authorization'] = 'Bearer ' + this.hfToken;
-
-      const url = new URL(this.apiUrl);
-      const req = https.request(
-        { hostname: url.hostname, path: url.pathname, method: 'POST', headers },
-        (res) => {
-          let data = '';
-          res.on('data', c => data += c);
-          res.on('end', () => {
-            try {
-              const parsed = JSON.parse(data);
-              // HF returns array of {generated_text} or an error object
-              if (Array.isArray(parsed) && parsed[0]?.generated_text) {
-                resolve(parsed[0].generated_text.trim());
-              } else if (parsed.error) {
-                // Model loading (cold start) — reject so we fall back
-                reject(new Error(parsed.error));
-              } else {
-                reject(new Error('Unexpected response: ' + data.slice(0, 100)));
-              }
-            } catch (e) {
-              reject(e);
-            }
-          });
-        }
-      );
       req.on('error', reject);
       req.write(payload);
       req.end();
@@ -174,45 +190,69 @@ class FreeAIProvider extends ProviderAdapter {
 
   _heuristicAnswer(query, files) {
     const q = query.toLowerCase();
+
     if (!files.length) {
       return {
         answer: "Please upload a document first and I'll help you analyse it. You can upload invoices, receipts, bank statements, or any business document from the Dashboard.",
-        sources: 0, mode: 'free'
+        sources: 0,
+        mode: 'free'
       };
     }
-    if (q.includes('total') || q.includes('amount') || q.includes('how much')) {
-      const totals = files.map(f => f.structuredData?.total).filter(Boolean);
-      return {
-        answer: totals.length
-          ? `From your documents I can see totals of: ${totals.join(', ')}. Upgrade to Pro for a full financial summary with Claude AI.`
-          : `I found ${files.length} document(s) but couldn't extract totals automatically. Upgrade to Starter or Pro for full AI extraction.`,
-        sources: files.length, mode: 'free'
-      };
+
+    const totals = files.map(f => f.structuredData?.total).filter(Boolean);
+    const amounts = files.map(f => f.structuredData?.amount).filter(Boolean);
+    const dates = files.map(f => f.structuredData?.date).filter(Boolean);
+    const invoiceNums = files.map(f => f.structuredData?.invoiceNumber).filter(Boolean);
+    const customers = files.map(f => f.structuredData?.customerName).filter(Boolean);
+    const vendors = files.map(f => f.structuredData?.vendorName).filter(Boolean);
+    const allValues = [...totals, ...amounts];
+
+    if (q.includes('total') || q.includes('amount') || q.includes('how much') || q.includes('sum')) {
+      if (allValues.length) {
+        return { answer: `From your ${files.length} document(s), the amounts found are: ${allValues.join(', ')}.`, sources: files.length, mode: 'free' };
+      }
     }
     if (q.includes('invoice') || q.includes('receipt')) {
-      const invoices = files.filter(f => ['invoice','receipt'].includes((f.structuredData?.documentType||'').toLowerCase()));
-      return {
-        answer: invoices.length
-          ? `You have ${invoices.length} invoice/receipt document(s): ${invoices.map(f=>f.originalName).join(', ')}. Upgrade to Pro to chat with them using Claude AI.`
-          : `I see ${files.length} document(s) uploaded. Upgrade to Starter or Pro for detailed invoice analysis.`,
-        sources: files.length, mode: 'free'
-      };
+      const inv = files.filter(f => ['invoice','receipt'].includes((f.structuredData?.documentType||'').toLowerCase()));
+      if (inv.length) {
+        return { answer: `You have ${inv.length} invoice/receipt(s)${invoiceNums.length ? ' — #' + invoiceNums.join(', #') : ''}: ${inv.map(f => f.originalName).join(', ')}.`, sources: files.length, mode: 'free' };
+      }
     }
+    if (q.includes('customer') || q.includes('client')) {
+      if (customers.length) return { answer: `Customers found: ${customers.join(', ')}.`, sources: files.length, mode: 'free' };
+    }
+    if (q.includes('vendor') || q.includes('supplier')) {
+      if (vendors.length) return { answer: `Vendors found: ${vendors.join(', ')}.`, sources: files.length, mode: 'free' };
+    }
+    if (q.includes('date') || q.includes('when')) {
+      if (dates.length) return { answer: `Document dates: ${dates.join(', ')}.`, sources: files.length, mode: 'free' };
+    }
+    if (q.includes('summary') || q.includes('overview')) {
+      const summary = files.map(f => {
+        const d = f.structuredData || {};
+        const parts = [d.documentType && `type: ${d.documentType}`, d.total && `total: ${d.total}`, d.date && `date: ${d.date}`].filter(Boolean).join(', ');
+        return `• ${f.originalName}${parts ? ' — ' + parts : ''}`;
+      }).join('\n');
+      return { answer: `Your ${files.length} document(s):\n${summary}`, sources: files.length, mode: 'free' };
+    }
+
+    const docNames = files.map(f => f.originalName).join(', ');
     return {
-      answer: `I can see you have ${files.length} document(s) uploaded. As a free user I have limited AI capabilities — upgrade to Starter or Pro to get full Claude AI answers about your documents.`,
-      sources: files.length, mode: 'free'
+      answer: `I can see ${files.length} document(s): ${docNames}.${allValues.length ? ` Amounts found: ${allValues.join(', ')}.` : ''} Set GEMINI_API_KEY for full AI responses.`,
+      sources: files.length,
+      mode: 'free'
     };
   }
 }
 
-/* ── Heuristic-only fallback (no API key, no HF) ────────────────────── */
+/* ── Heuristic-only (no keys at all) ────────────────────────────────── */
 class HeuristicProvider extends ProviderAdapter {
   async extractDocumentData({ fileName }) {
     return { documentType: 'Unknown', confidence: 0.5, fields: {}, cleaned: {}, summary: `Uploaded ${fileName}` };
   }
   async answerQuery(query, files) {
     if (!files.length) return { answer: 'Please upload a document first so I can help analyse it.', sources: 0, mode: 'heuristic' };
-    return { answer: `I reviewed ${files.length} document(s). Set ANTHROPIC_API_KEY to enable full AI responses.`, sources: files.length, mode: 'heuristic' };
+    return { answer: `I reviewed ${files.length} document(s). Set GEMINI_API_KEY for free AI responses.`, sources: files.length, mode: 'heuristic' };
   }
 }
 
