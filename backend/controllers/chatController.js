@@ -65,6 +65,7 @@ async function uploadInChat(req, res) {
     const extraction = await aiService.extractDocumentData({
       fileName: req.file.originalname,
       rawText,
+      filePath: req.file.path,
       contentType: req.file.mimetype
     }, plan);
 
@@ -182,4 +183,25 @@ async function getStats(req, res) {
   }
 }
 
-module.exports = { upload, listChats, createChat, sendMessage, uploadInChat, getStats, updateChatModel };
+module.exports = { upload, listChats, createChat, sendMessage, uploadInChat, getStats, updateChatModel, renameChat, deleteChat };
+// Rename a chat
+async function renameChat(req, res) {
+  const { id } = req.params;
+  const { title } = req.body;
+  if (!title || !title.trim()) return res.status(400).json({ error: 'title is required' });
+  const chat = await ChatSession.findOneAndUpdate(
+    { _id: id, userId: req.user.id },
+    { title: title.trim() },
+    { new: true }
+  );
+  if (!chat) return res.status(404).json({ error: 'Chat not found' });
+  return res.json({ chat });
+}
+
+// Delete a chat
+async function deleteChat(req, res) {
+  const { id } = req.params;
+  const chat = await ChatSession.findOneAndDelete({ _id: id, userId: req.user.id });
+  if (!chat) return res.status(404).json({ error: 'Chat not found' });
+  return res.json({ ok: true });
+}

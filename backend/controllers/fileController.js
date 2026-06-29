@@ -40,6 +40,7 @@ async function uploadFile(req, res) {
       contentType: req.file.mimetype,
       size: req.file.size,
       filePath: req.file.path,
+      chatSession: req.body.chatId || null,
       extractedText: rawText,
       structuredData: extraction.cleaned,
       status: 'processed'

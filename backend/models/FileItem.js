@@ -8,6 +8,7 @@ const fileItemSchema = new mongoose.Schema(
     contentType: { type: String },
     size: { type: Number },
     filePath: { type: String },
+    chatSession: { type: mongoose.Schema.Types.ObjectId, ref: 'ChatSession' },
     extractedText: { type: String, default: '' },
     structuredData: { type: Object, default: {} },
     status: { type: String, default: 'processed' }

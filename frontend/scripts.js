@@ -149,91 +149,50 @@ function initIndexPage() {
    ════════════════════════════════════════════════════════════════════════ */
 let activeChatId = null;
 let userPlan = 'free';
-let pendingFile = null;
+let pendingFiles = [];
+let allChats = [];
+let isStreaming = false;
 
-function initChatPage() {
-  if (!getToken()) { window.location.href = '/'; return; }
-
-  // Model selector
-  document.getElementById('modelSelect').addEventListener('change', async (e) => {
-    if (!activeChatId) return;
-    try {
-      await apiFetch(`/chats/${activeChatId}/model`, { method: 'PATCH', body: JSON.stringify({ selectedModel: e.target.value }) });
-      showToast('Model updated');
-    } catch (err) { showToast('Error updating model: ' + err.message, 'error'); }
-  });
-
-  // Sidebar nav link hover (replaces onmouseover/onmouseout)
-  document.querySelectorAll('.sidebar-nav-link').forEach(link => {
-    link.addEventListener('mouseover', () => {
-      link.style.color = 'var(--text)';
-      link.style.background = 'var(--surface)';
-    });
-    link.addEventListener('mouseout', () => {
-      link.style.color = 'var(--muted)';
-      link.style.background = 'transparent';
-    });
-  });
-
-  // Prompt chip buttons
-  document.querySelectorAll('[data-prompt]').forEach(btn => {
-    btn.addEventListener('click', () => insertPrompt(btn.dataset.prompt));
-  });
-
-  // File attach
-  const chatFileInput = document.getElementById('chatFileInput');
-  const attachBtn = document.getElementById('attachBtn');
-
-  attachBtn.addEventListener('click', () => chatFileInput.click());
-
-  chatFileInput.addEventListener('change', function () {
-    const file = this.files[0];
-    if (!file) return;
-    pendingFile = file;
-    document.getElementById('attachChipName').textContent = file.name;
-    document.getElementById('attachChipWrap').style.display = 'block';
-    attachBtn.classList.add('has-file');
-    this.value = '';
-  });
-
-  document.getElementById('attachClearBtn').addEventListener('click', clearAttach);
-
-  // Send
-  document.getElementById('sendBtn').addEventListener('click', sendMessage);
-  document.getElementById('chatInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
-  });
-  document.getElementById('chatInput').addEventListener('input', function () {
-    this.style.height = 'auto';
-    this.style.height = Math.min(this.scrollHeight, 160) + 'px';
-  });
-
-  // New chat
-  document.getElementById('newChatBtn').addEventListener('click', async () => {
-    const btn = document.getElementById('newChatBtn');
-    btn.disabled = true; btn.textContent = 'Creating…';
-    try {
-      const { chat } = await apiFetch('/chats', { method: 'POST', body: JSON.stringify({ title: 'New conversation' }) });
-      selectChat(chat);
-      const { chats } = await apiFetch('/chats');
-      renderChatList(chats || []);
-    } catch {}
-    btn.disabled = false; btn.textContent = '+ New chat';
-  });
-
-  loadChats();
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
-function clearAttach() {
-  pendingFile = null;
-  document.getElementById('attachChipWrap').style.display = 'none';
-  const attachBtn = document.getElementById('attachBtn');
-  if (attachBtn) attachBtn.classList.remove('has-file');
+function fileIcon(name) {
+  const ext = (name || '').split('.').pop().toLowerCase();
+  const map = {
+    pdf: ['📄', 'ftype-pdf'],
+    png: ['🖼️', 'ftype-img'],
+    jpg: ['🖼️', 'ftype-img'],
+    jpeg: ['🖼️', 'ftype-img'],
+    gif: ['🖼️', 'ftype-img'],
+    webp: ['🖼️', 'ftype-img'],
+    csv: ['📊', 'ftype-csv'],
+    xlsx: ['📊', 'ftype-xlsx'],
+    xls: ['📊', 'ftype-xlsx'],
+    json: ['{}', 'ftype-json'],
+    xml: ['📋', 'ftype-xml'],
+    txt: ['📝', 'ftype-txt'],
+    doc: ['📝', 'ftype-doc'],
+    docx: ['📝', 'ftype-doc'],
+    zip: ['🗜️', 'ftype-default']
+  };
+  return map[ext] || ['📎', 'ftype-default'];
 }
 
-function insertPrompt(text) {
-  const input = document.getElementById('chatInput');
-  if (input) { input.value = text; input.focus(); }
+function fileSize(bytes) {
+  if (!bytes) return '0 B';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function renderMarkdown(text) {
+  const safe = escapeHtml(text || '');
+  return safe.replace(/\n/g, '<br>');
 }
 
 function showPlanBanner(plan) {
@@ -241,41 +200,112 @@ function showPlanBanner(plan) {
   const banner = document.getElementById('planBanner');
   if (!banner) return;
   if (plan === 'free') {
-    banner.innerHTML =
-      '⚡ You\'re on the <strong>Free plan</strong> — using Gemini AI. ' +
-      '<a href="/pricing" style="color:var(--accent);font-weight:600;">Upgrade to Pro</a> for Claude AI answers.';
+    banner.innerHTML = '<span>Free plan — AI works on uploaded files in this chat.</span>';
     banner.style.display = 'block';
   } else {
     banner.style.display = 'none';
   }
 }
 
-function escapeHtml(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-    .replace(/\n/g,'<br>');
+function renderAttachBar() {
+  const attachBar = document.getElementById('attachPreviewBar');
+  const attachBtn = document.getElementById('attachBtn');
+  if (!attachBar || !attachBtn) return;
+
+  if (!pendingFiles.length) {
+    attachBar.style.display = 'none';
+    attachBar.innerHTML = '';
+    attachBtn.classList.remove('has-file');
+    return;
+  }
+
+  attachBar.style.display = 'flex';
+  attachBtn.classList.add('has-file');
+  attachBar.innerHTML = pendingFiles.map((file, index) => {
+    const [icon, cssClass] = fileIcon(file.name);
+    return `<div class="attach-chip">
+      <span class="${cssClass}">${icon}</span>
+      <span class="chip-name">${escapeHtml(file.name)}</span>
+      <span class="chip-size">${fileSize(file.size)}</span>
+      <button type="button" data-index="${index}" title="Remove">×</button>
+    </div>`;
+  }).join('');
+
+  attachBar.querySelectorAll('button[data-index]').forEach((button) => {
+    button.addEventListener('click', () => {
+      pendingFiles.splice(Number(button.dataset.index), 1);
+      renderAttachBar();
+    });
+  });
 }
 
-function appendMessage(role, content, mode, fileName) {
+function clearAttach() {
+  pendingFiles = [];
+  renderAttachBar();
+}
+
+function showEmpty(show) {
+  const emptyEl = document.getElementById('emptyState');
+  if (!emptyEl) return;
+  emptyEl.style.display = show ? '' : 'none';
+}
+
+function appendMessage(role, content, mode, fileChips) {
   const area = document.getElementById('messages');
-  document.getElementById('emptyState')?.remove();
-  let label, avatarClass;
-  if (role === 'assistant') {
-    label = (mode === 'claude') ? 'Claude' : 'AI';
-    avatarClass = (mode === 'claude') ? 'avatar-claude' : 'avatar-free';
-  } else {
-    label = 'You'; avatarClass = 'avatar-user';
-  }
+  if (!area) return null;
+  const emptyEl = document.getElementById('emptyState');
+  if (emptyEl) emptyEl.remove();
+
   const div = document.createElement('div');
   div.className = 'msg ' + role;
-  let bubbleContent = '';
-  if (fileName && role === 'user') {
-    bubbleContent += `<div class="msg-file-chip">📎 ${escapeHtml(fileName)}</div><br>`;
+  const isUser = role === 'user';
+  const metaLabel = isUser ? 'You' : 'FlowFast AI';
+  const badgeHtml = !isUser && mode
+    ? `<span class="model-badge">${mode === 'claude' ? '⬡ Claude' : mode === 'free' ? '◈ Gemini' : '◎ AI'}</span>`
+    : '';
+
+  div.innerHTML = `
+    <div class="msg-meta">${metaLabel} ${badgeHtml}</div>
+    ${fileChips ? `<div>${fileChips}</div>` : ''}
+    <div class="msg-bubble"></div>
+    <div class="msg-actions">
+      <button class="msg-action-btn copy-btn" type="button">Copy</button>
+      ${!isUser ? `<button class="msg-action-btn regenerate-btn" type="button">Regenerate</button>` : ''}
+    </div>`;
+
+  const bubble = div.querySelector('.msg-bubble');
+  if (isUser) {
+    bubble.textContent = content;
+  } else {
+    bubble.innerHTML = renderMarkdown(content);
+    bubble.querySelectorAll('pre').forEach((pre) => {
+      const btn = document.createElement('button');
+      btn.className = 'pre-copy-btn';
+      btn.textContent = 'Copy';
+      btn.addEventListener('click', () => {
+        navigator.clipboard.writeText(pre.querySelector('code')?.textContent || pre.textContent);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy'; }, 2000);
+      });
+      pre.style.position = 'relative';
+      pre.appendChild(btn);
+    });
   }
-  bubbleContent += escapeHtml(content);
-  div.innerHTML =
-    `<div class="msg-avatar ${avatarClass}">${label}</div>` +
-    `<div class="msg-bubble">${bubbleContent}</div>`;
+
+  const copyBtn = div.querySelector('.copy-btn');
+  if (copyBtn) {
+    copyBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(bubble.textContent || '');
+      copyBtn.textContent = '✓ Copied';
+      setTimeout(() => { copyBtn.textContent = 'Copy'; }, 2000);
+    });
+  }
+
+  const regenBtn = div.querySelector('.regenerate-btn');
+  if (regenBtn) {
+    regenBtn.addEventListener('click', () => regenerateLast());
+  }
+
   area.appendChild(div);
   area.scrollTop = area.scrollHeight;
   return div;
@@ -283,128 +313,419 @@ function appendMessage(role, content, mode, fileName) {
 
 function appendTyping() {
   const area = document.getElementById('messages');
+  if (!area) return null;
   const div = document.createElement('div');
   div.className = 'msg assistant';
   div.id = 'typingIndicator';
-  div.innerHTML =
-    `<div class="msg-avatar ${userPlan === 'free' ? 'avatar-free' : 'avatar-claude'}">${userPlan === 'free' ? 'AI' : 'Claude'}</div>` +
-    `<div class="msg-bubble"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>`;
+  div.innerHTML = `
+    <div class="msg-meta">FlowFast AI</div>
+    <div class="msg-bubble">
+      <div class="thinking-bar">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+        Thinking…
+      </div>
+    </div>`;
   area.appendChild(div);
   area.scrollTop = area.scrollHeight;
+  return div;
+}
+
+function buildFileChips(files) {
+  return files.map((file) => {
+    const [icon] = fileIcon(file.name);
+    return `<div class="msg-file-chip"><span class="file-icon">${icon}</span> ${escapeHtml(file.name)} <span class="file-size">${fileSize(file.size)}</span></div>`;
+  }).join('');
 }
 
 async function sendMessage() {
-  console.log('sendMessage called, activeChatId:', activeChatId);
-  if (!activeChatId) {
-    console.warn('No active chat selected');
-    return;
-  }
+  if (!activeChatId || isStreaming) return;
   const input = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  if (!input || !sendBtn) return;
+
   const message = input.value.trim();
-  if (!message && !pendingFile) return;
+  if (!message && !pendingFiles.length) return;
+
+  isStreaming = true;
+  sendBtn.disabled = true;
   input.value = '';
   input.style.height = 'auto';
-  document.getElementById('sendBtn').disabled = true;
-  const fileToSend = pendingFile;
-  clearAttach();
-  if (fileToSend) {
-    appendMessage('user', message || `Tell me about ${fileToSend.name}`, 'user', fileToSend.name);
-  } else {
-    appendMessage('user', message);
-  }
-  appendTyping();
+
+  const filesToSend = [...pendingFiles];
+  pendingFiles = [];
+  renderAttachBar();
+
+  const chips = filesToSend.length ? buildFileChips(filesToSend) : null;
+  appendMessage('user', message || (filesToSend.length ? `Tell me about ${filesToSend.map((file) => file.name).join(', ')}` : ''), null, chips);
+  const typingEl = appendTyping();
+
   try {
     let data;
-    if (fileToSend) {
-      const fd = new FormData();
-      fd.append('file', fileToSend);
-      if (message) fd.append('message', message);
-      const res = await fetch(`/api/chats/${activeChatId}/upload`, {
-        method: 'POST',
-        headers: { Authorization: 'Bearer ' + getToken() },
-        body: fd
-      });
-      data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Upload failed');
+    if (filesToSend.length) {
+      let lastData;
+      for (let index = 0; index < filesToSend.length; index += 1) {
+        const fd = new FormData();
+        fd.append('file', filesToSend[index]);
+        if (index === filesToSend.length - 1 && message) fd.append('message', message);
+        else if (index === filesToSend.length - 1) fd.append('message', `I uploaded ${filesToSend.length} files: ${filesToSend.map((file) => file.name).join(', ')}. Please analyze them for office work.`);
+
+        const headers = {};
+        const token = getToken();
+        if (token) headers.Authorization = 'Bearer ' + token;
+
+        const res = await fetch(`/api/chats/${activeChatId}/upload`, { method: 'POST', headers, body: fd });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(payload.error || 'Upload failed');
+        lastData = payload;
+      }
+      data = lastData;
     } else {
       data = await apiFetch('/chats/' + activeChatId + '/messages', {
         method: 'POST',
         body: JSON.stringify({ message })
       });
     }
-    if (data.plan) showPlanBanner(data.plan);
-    document.getElementById('typingIndicator')?.remove();
+
+    typingEl?.remove();
     appendMessage('assistant', data.reply?.answer || 'No response.', data.reply?.mode);
+    if (data.chat?.title && data.chat.title !== 'New conversation') {
+      document.getElementById('chatTitle').textContent = data.chat.title;
+      updateChatInList(data.chat);
+    }
   } catch (err) {
-    document.getElementById('typingIndicator')?.remove();
-    appendMessage('assistant', '⚠️ ' + err.message, 'free');
+    typingEl?.remove();
+    appendMessage('assistant', '⚠️ ' + err.message, 'error');
   } finally {
-    document.getElementById('sendBtn').disabled = false;
+    isStreaming = false;
+    sendBtn.disabled = false;
     input.focus();
   }
 }
 
-async function loadChats() {
-  try {
-    const [{ chats }, subData] = await Promise.all([
-      apiFetch('/chats'),
-      apiFetch('/payments/subscription').catch(() => ({ subscription: { plan: 'free' } }))
-    ]);
-    showPlanBanner(subData.subscription?.plan || 'free');
-    renderChatList(chats || []);
-    if (chats?.length) selectChat(chats[0]);
-  } catch { window.location.href = '/'; }
-}
-
 function renderChatList(chats) {
-  const el = document.getElementById('chatList');
-  if (!chats.length) {
-    el.innerHTML = '<div class="text-xs muted" style="padding:0.5rem;">No chats yet</div>';
+  const chatList = document.getElementById('chatList');
+  if (!chatList) return;
+  allChats = chats || [];
+  const chatSearch = document.getElementById('chatSearch');
+  const query = (chatSearch?.value || '').toLowerCase();
+  const filtered = query ? allChats.filter((chat) => (chat.title || '').toLowerCase().includes(query)) : allChats;
+
+  if (!filtered.length) {
+    chatList.innerHTML = `<div class="text-xs muted" style="padding:0.5rem 0.65rem;">${query ? 'No results' : 'No chats yet'}</div>`;
     return;
   }
-  el.innerHTML = chats.map(c =>
-    `<button class="chat-item ${c._id === activeChatId ? 'active' : ''}" data-id="${c._id}">${c.title || 'Conversation'}</button>`
-  ).join('');
-  el.querySelectorAll('.chat-item').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const { chats } = await apiFetch('/chats');
-      const chat = chats.find(c => c._id === btn.dataset.id);
+
+  chatList.innerHTML = filtered.map((chat) => `
+    <div class="chat-item${activeChatId === chat._id ? ' active' : ''}" data-id="${chat._id}">
+      <svg class="chat-item-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span class="chat-item-label" id="label-${chat._id}">${escapeHtml(chat.title || 'Untitled')}</span>
+      <div class="chat-item-actions">
+        <button class="chat-item-btn" type="button" data-action="rename" data-id="${chat._id}" title="Rename">✎</button>
+        <button class="chat-item-btn del" type="button" data-action="delete" data-id="${chat._id}" title="Delete">✕</button>
+      </div>
+    </div>`).join('');
+
+  chatList.querySelectorAll('.chat-item').forEach((item) => {
+    item.addEventListener('click', (event) => {
+      if (event.target.closest('[data-action]')) return;
+      const chatId = item.dataset.id;
+      const chat = allChats.find((entry) => entry._id === chatId);
       if (chat) selectChat(chat);
     });
   });
+
+  chatList.querySelectorAll('[data-action="rename"]').forEach((button) => {
+    button.addEventListener('click', () => renameChat(button.dataset.id));
+  });
+  chatList.querySelectorAll('[data-action="delete"]').forEach((button) => {
+    button.addEventListener('click', () => deleteChat(button.dataset.id));
+  });
+}
+
+function updateChatInList(chat) {
+  allChats = allChats.map((entry) => (entry._id === chat._id ? { ...entry, ...chat } : entry));
+  renderChatList(allChats);
 }
 
 function selectChat(chat) {
-  clearAttach();
+  const chatTitle = document.getElementById('chatTitle');
+  const chatMeta = document.getElementById('chatMeta');
+  const messagesEl = document.getElementById('messages');
+  const modelSelect = document.getElementById('modelSelect');
+  if (!chatTitle || !chatMeta || !messagesEl || !modelSelect) return;
+
   activeChatId = chat._id;
-  document.getElementById('modelSelect').value = chat.selectedModel || 'gemini';
-  document.getElementById('chatTitle').textContent = chat.title || 'Conversation';
-  document.getElementById('chatMeta').textContent =
-    chat.lastMessage ? 'Last: ' + chat.lastMessage : 'Attach documents or ask anything';
-  const area = document.getElementById('messages');
-  area.innerHTML = '';
-  if (chat.messages?.length) {
-    chat.messages.forEach(m => {
-      if (m.role === 'user' && m.content.startsWith('📎 Attached:')) {
-        const lines = m.content.split('\n');
-        const fname = lines[0].replace('📎 Attached: ', '');
-        const rest = lines.slice(1).join('\n');
-        appendMessage('user', rest || `Tell me about ${fname}`, 'user', fname);
-      } else {
-        appendMessage(m.role, m.content, m.role === 'assistant' ? (userPlan === 'free' ? 'free' : 'claude') : undefined);
+  modelSelect.value = chat.selectedModel || 'gemini';
+  updateModelDot();
+  chatTitle.textContent = chat.title || 'Untitled';
+  chatMeta.textContent = chat.lastMessage ? 'Last: ' + chat.lastMessage : 'Attach documents or ask anything';
+
+  const nodes = Array.from(messagesEl.children).filter((node) => node.id !== 'emptyState');
+  nodes.forEach((node) => node.remove());
+  showEmpty(!(chat.messages?.length));
+
+  (chat.messages || []).forEach((message) => {
+    let content = message.content || '';
+    let chips = null;
+    if (message.role === 'user' && content.startsWith('📎 Attached:')) {
+      const parts = content.split('\n');
+      const fileName = parts[0].replace('📎 Attached:', '').trim();
+      chips = `<div class="msg-file-chip"><span class="file-icon">${fileIcon(fileName)[0]}</span> ${escapeHtml(fileName)}</div>`;
+      content = parts.slice(1).join('\n').trim();
+    }
+    appendMessage(message.role, content, message.role === 'assistant' ? (userPlan === 'free' ? 'free' : 'claude') : null, chips);
+  });
+
+  renderChatList(allChats);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function updateModelDot() {
+  const modelDot = document.getElementById('modelDot');
+  const modelSelect = document.getElementById('modelSelect');
+  if (!modelDot || !modelSelect) return;
+  const isPaid = modelSelect.value === 'claude';
+  modelDot.style.background = isPaid ? '#a78bfa' : '#22c55e';
+}
+
+async function regenerateLast() {
+  if (!activeChatId || isStreaming) return;
+  const messagesEl = document.getElementById('messages');
+  if (!messagesEl) return;
+  const userMessages = messagesEl.querySelectorAll('.msg.user');
+  if (!userMessages.length) return;
+  const lastUserBubble = userMessages[userMessages.length - 1].querySelector('.msg-bubble');
+  const lastMessage = lastUserBubble?.textContent?.trim();
+  if (!lastMessage) return;
+
+  const assistantMessages = messagesEl.querySelectorAll('.msg.assistant');
+  if (assistantMessages.length) assistantMessages[assistantMessages.length - 1].remove();
+  const input = document.getElementById('chatInput');
+  if (input) input.value = lastMessage;
+  await sendMessage();
+}
+
+async function renameChat(chatId) {
+  const labelEl = document.getElementById('label-' + chatId);
+  if (!labelEl) return;
+  const currentTitle = labelEl.textContent;
+  const input = document.createElement('input');
+  input.className = 'chat-item-rename-input';
+  input.value = currentTitle;
+  labelEl.replaceWith(input);
+  input.focus();
+  input.select();
+
+  async function save() {
+    const newTitle = input.value.trim() || currentTitle;
+    try {
+      await apiFetch(`/chats/${chatId}`, { method: 'PATCH', body: JSON.stringify({ title: newTitle }) });
+      allChats = allChats.map((entry) => (entry._id === chatId ? { ...entry, title: newTitle } : entry));
+    } catch {}
+    renderChatList(allChats);
+    if (activeChatId === chatId) {
+      const chatTitle = document.getElementById('chatTitle');
+      if (chatTitle) chatTitle.textContent = newTitle;
+    }
+  }
+
+  input.addEventListener('blur', save);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') save();
+    if (event.key === 'Escape') renderChatList(allChats);
+  });
+}
+
+async function deleteChat(chatId) {
+  if (!confirm('Delete this chat?')) return;
+  try {
+    await apiFetch(`/chats/${chatId}`, { method: 'DELETE' });
+    allChats = allChats.filter((chat) => chat._id !== chatId);
+    renderChatList(allChats);
+    if (activeChatId === chatId) {
+      activeChatId = null;
+      const messagesEl = document.getElementById('messages');
+      if (messagesEl) {
+        messagesEl.innerHTML = '';
+        showEmpty(true);
+      }
+      const chatTitle = document.getElementById('chatTitle');
+      if (chatTitle) chatTitle.textContent = 'Select or start a chat';
+    }
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+}
+
+window.selectChatById = (chatId) => {
+  const chat = allChats.find((entry) => entry._id === chatId);
+  if (chat) selectChat(chat);
+};
+window.renameChat = renameChat;
+window.deleteChat = deleteChat;
+
+async function loadChats() {
+  try {
+    const token = getToken();
+    if (!token) {
+      window.location.href = '/';
+      return;
+    }
+
+    const [{ chats }, subData] = await Promise.all([
+      apiFetch('/chats'),
+      apiFetch('/payments/subscription').catch(() => ({ plan: 'free' }))
+    ]);
+
+    userPlan = subData?.plan || 'free';
+    allChats = chats || [];
+    renderChatList(allChats);
+    if (allChats.length) selectChat(allChats[0]);
+    showPlanBanner(userPlan);
+  } catch (err) {
+    console.error(err);
+    if (err.message?.includes('401') || err.message?.includes('token')) window.location.href = '/';
+  }
+}
+
+function initChatPage() {
+  if (!getToken()) { window.location.href = '/'; return; }
+
+  const chatInput = document.getElementById('chatInput');
+  const sendBtn = document.getElementById('sendBtn');
+  const attachBtn = document.getElementById('attachBtn');
+  const fileInput = document.getElementById('chatFileInput');
+  const modelSelect = document.getElementById('modelSelect');
+  const sidebarToggle = document.getElementById('sidebarToggle');
+  const sidebarOverlay = document.getElementById('sidebarOverlay');
+  const sidebar = document.getElementById('chatSidebar');
+  const chatSearch = document.getElementById('chatSearch');
+  const scrollBtn = document.getElementById('scrollBtn');
+  const messagesEl = document.getElementById('messages');
+
+  if (chatInput) {
+    chatInput.addEventListener('input', () => {
+      chatInput.style.height = 'auto';
+      chatInput.style.height = Math.min(chatInput.scrollHeight, 180) + 'px';
+    });
+    chatInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
       }
     });
-  } else {
-    area.innerHTML =
-      '<div class="empty-state">' +
-      '<div class="es-icon">💬</div>' +
-      '<h3>New conversation</h3>' +
-      '<p>Ask me anything or attach a document with the 📎 button.</p>' +
-      '</div>';
   }
-  document.querySelectorAll('.chat-item').forEach(b =>
-    b.classList.toggle('active', b.dataset.id === activeChatId)
-  );
+
+  if (sendBtn) sendBtn.addEventListener('click', sendMessage);
+  if (attachBtn && fileInput) attachBtn.addEventListener('click', () => fileInput.click());
+  if (fileInput) {
+    fileInput.addEventListener('change', () => {
+      const files = Array.from(fileInput.files || []);
+      if (files.length) {
+        pendingFiles = [...pendingFiles, ...files];
+        renderAttachBar();
+        fileInput.value = '';
+      }
+    });
+  }
+
+  if (modelSelect) {
+    modelSelect.addEventListener('change', async () => {
+      updateModelDot();
+      if (!activeChatId) return;
+      try {
+        await apiFetch(`/chats/${activeChatId}/model`, { method: 'PATCH', body: JSON.stringify({ selectedModel: modelSelect.value }) });
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+    updateModelDot();
+  }
+
+  if (messagesEl) {
+    messagesEl.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      messagesEl.style.outline = '2px dashed var(--accent)';
+    });
+    messagesEl.addEventListener('dragleave', () => {
+      messagesEl.style.outline = '';
+    });
+    messagesEl.addEventListener('drop', (event) => {
+      event.preventDefault();
+      messagesEl.style.outline = '';
+      const files = Array.from(event.dataTransfer?.files || []);
+      if (files.length) {
+        pendingFiles = [...pendingFiles, ...files];
+        renderAttachBar();
+        showToast(`${files.length} file(s) attached`, 'success');
+      }
+    });
+    messagesEl.addEventListener('scroll', () => {
+      const atBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
+      if (scrollBtn) scrollBtn.classList.toggle('show', !atBottom);
+    });
+  }
+
+  if (sidebarToggle && sidebar && sidebarOverlay) {
+    sidebarToggle.addEventListener('click', () => {
+      sidebar.classList.toggle('open');
+      sidebarOverlay.classList.toggle('show');
+    });
+    sidebarOverlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      sidebarOverlay.classList.remove('show');
+    });
+  }
+
+  if (chatSearch) chatSearch.addEventListener('input', () => renderChatList(allChats));
+  if (scrollBtn) scrollBtn.addEventListener('click', () => {
+    const messagesEl = document.getElementById('messages');
+    if (messagesEl) messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+  });
+
+  document.querySelectorAll('.es-card[data-prompt]').forEach((button) => {
+    button.addEventListener('click', () => {
+      if (chatInput) {
+        chatInput.value = button.dataset.prompt;
+        chatInput.focus();
+      }
+    });
+  });
+
+  document.getElementById('newChatBtn')?.addEventListener('click', async () => {
+    const button = document.getElementById('newChatBtn');
+    if (!button) return;
+    button.disabled = true;
+    button.textContent = '…';
+    try {
+      const { chat } = await apiFetch('/chats', { method: 'POST', body: JSON.stringify({ title: 'New conversation' }) });
+      allChats.unshift(chat);
+      renderChatList(allChats);
+      selectChat(chat);
+    } catch (err) {
+      showToast(err.message, 'error');
+    } finally {
+      button.disabled = false;
+      button.textContent = '+ New chat';
+    }
+  });
+
+  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    localStorage.removeItem(TOKEN_KEY);
+    window.location.href = '/';
+  });
+
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
+    const html = document.documentElement;
+    const next = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    html.dataset.theme = next;
+    localStorage.setItem('ff-theme', next);
+  });
+
+  const savedTheme = localStorage.getItem('ff-theme');
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+
+  loadChats();
 }
 
 /* ════════════════════════════════════════════════════════════════════════
