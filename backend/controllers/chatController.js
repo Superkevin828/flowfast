@@ -42,9 +42,9 @@ async function listChats(req, res) {
 }
 
 async function createChat(req, res) {
-  const { title = 'New conversation' } = req.body;
+  const { title = 'New conversation', selectedModel = 'gemini' } = req.body;
   const externalId = `chat_${Date.now()}`;
-  const chat = await ChatSession.create({ userId: req.user.id, title, externalId, lastMessage: '' });
+  const chat = await ChatSession.create({ userId: req.user.id, title, externalId, lastMessage: '', selectedModel });
   return res.status(201).json({ chat });
 }
 
@@ -88,7 +88,7 @@ async function uploadInChat(req, res) {
       ? message.trim()
       : `I just uploaded ${req.file.originalname}. Please summarize what's in it and tell me the key information.`;
 
-    const reply = await aiService.answerQuery(userPrompt, allFiles, plan, priorMessages);
+    const reply = await aiService.answerQuery(userPrompt, allFiles, plan, priorMessages, chat.selectedModel);
 
     chat.messages = chat.messages || [];
     chat.messages.push({ role: 'user', content: `📎 Attached: ${req.file.originalname}${message.trim() ? '\n' + message.trim() : ''}` });
@@ -118,7 +118,7 @@ async function sendMessage(req, res) {
   ]);
 
   const priorMessages = (chat.messages || []).slice(-10).map(m => ({ role: m.role, content: m.content }));
-  const reply = await aiService.answerQuery(message, files, plan, priorMessages);
+  const reply = await aiService.answerQuery(message, files, plan, priorMessages, chat.selectedModel);
 
   chat.messages = chat.messages || [];
   chat.messages.push({ role: 'user', content: message });
@@ -128,6 +128,15 @@ async function sendMessage(req, res) {
   await chat.save();
 
   return res.json({ chat, reply, plan });
+}
+
+async function updateChatModel(req, res) {
+  const { id } = req.params;
+  const { selectedModel } = req.body;
+  if (!['claude', 'gemini'].includes(selectedModel)) return res.status(400).json({ error: 'Invalid model' });
+  const chat = await ChatSession.findOneAndUpdate({ _id: id, userId: req.user.id }, { selectedModel }, { new: true });
+  if (!chat) return res.status(404).json({ error: 'Chat not found' });
+  return res.json({ chat });
 }
 
 /* Stats for analyst dashboard */
@@ -173,4 +182,4 @@ async function getStats(req, res) {
   }
 }
 
-module.exports = { upload, listChats, createChat, sendMessage, uploadInChat, getStats };
+module.exports = { upload, listChats, createChat, sendMessage, uploadInChat, getStats, updateChatModel };

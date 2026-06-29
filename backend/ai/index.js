@@ -19,8 +19,15 @@ class AIService {
     return provider.extractDocumentData(payload);
   }
 
-  async answerQuery(query, files, plan = 'free', history = []) {
-    const provider = this._pick(plan);
+  async answerQuery(query, files, plan = 'free', history = [], model = null) {
+    let provider;
+    if (model === 'claude' && this.claudeProvider) {
+      provider = this.claudeProvider;
+    } else if (model === 'gemini') {
+      provider = this.freeProvider;
+    } else {
+      provider = this._pick(plan);
+    }
     return provider.answerQuery(query, files, history);
   }
 

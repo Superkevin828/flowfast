@@ -6,6 +6,7 @@ const chatSessionSchema = new mongoose.Schema(
     title: { type: String, default: 'New conversation' },
     externalId: { type: String, required: true },
     lastMessage: { type: String, default: '' },
+    selectedModel: { type: String, enum: ['claude', 'gemini'], default: 'gemini' },
     metadata: { type: Object, default: {} }
   },
   { timestamps: true }
