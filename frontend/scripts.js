@@ -208,7 +208,7 @@ function showPlanBanner(plan) {
 }
 
 function renderAttachBar() {
-  const attachBar = document.getElementById('attachPreviewBar');
+  const attachBar = document.getElementById('attachBar');
   const attachBtn = document.getElementById('attachBtn');
   if (!attachBar || !attachBtn) return;
 
@@ -257,20 +257,25 @@ function appendMessage(role, content, mode, fileChips) {
   if (emptyEl) emptyEl.remove();
 
   const div = document.createElement('div');
-  div.className = 'msg ' + role;
+  div.className = 'msg-row ' + (role === 'user' ? 'user' : 'assistant');
   const isUser = role === 'user';
-  const metaLabel = isUser ? 'You' : 'FlowFast AI';
   const badgeHtml = !isUser && mode
-    ? `<span class="model-badge">${mode === 'claude' ? '⬡ Claude' : mode === 'free' ? '◈ Gemini' : '◎ AI'}</span>`
+    ? `<span class="msg-model-tag">${mode === 'claude' ? '⬡ Claude' : mode === 'free' ? '◈ Gemini' : '◎ AI'}</span>`
     : '';
+  const avatarHtml = isUser
+    ? `<div class="msg-avatar human">You</div>`
+    : `<div class="msg-avatar ai"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>`;
 
   div.innerHTML = `
-    <div class="msg-meta">${metaLabel} ${badgeHtml}</div>
-    ${fileChips ? `<div>${fileChips}</div>` : ''}
-    <div class="msg-bubble"></div>
-    <div class="msg-actions">
-      <button class="msg-action-btn copy-btn" type="button">Copy</button>
-      ${!isUser ? `<button class="msg-action-btn regenerate-btn" type="button">Regenerate</button>` : ''}
+    ${avatarHtml}
+    <div class="msg-body">
+      <div class="msg-name">${isUser ? 'You' : 'FlowFast AI'} ${badgeHtml}</div>
+      ${fileChips ? `<div class="msg-files">${fileChips}</div>` : ''}
+      <div class="msg-bubble"></div>
+      <div class="msg-actions">
+        <button class="msg-act-btn copy-btn" type="button">Copy</button>
+        ${!isUser ? `<button class="msg-act-btn regenerate-btn" type="button">Regenerate</button>` : ''}
+      </div>
     </div>`;
 
   const bubble = div.querySelector('.msg-bubble');
@@ -315,14 +320,17 @@ function appendTyping() {
   const area = document.getElementById('messages');
   if (!area) return null;
   const div = document.createElement('div');
-  div.className = 'msg assistant';
+  div.className = 'msg-row assistant';
   div.id = 'typingIndicator';
   div.innerHTML = `
-    <div class="msg-meta">FlowFast AI</div>
-    <div class="msg-bubble">
-      <div class="thinking-bar">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
-        Thinking…
+    <div class="msg-avatar ai"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+    <div class="msg-body">
+      <div class="msg-name">FlowFast AI</div>
+      <div class="msg-bubble">
+        <div class="thinking">
+          <div class="thinking-dots"><span></span><span></span><span></span></div>
+          Thinking…
+        </div>
       </div>
     </div>`;
   area.appendChild(div);
@@ -333,7 +341,7 @@ function appendTyping() {
 function buildFileChips(files) {
   return files.map((file) => {
     const [icon] = fileIcon(file.name);
-    return `<div class="msg-file-chip"><span class="file-icon">${icon}</span> ${escapeHtml(file.name)} <span class="file-size">${fileSize(file.size)}</span></div>`;
+    return `<div class="file-chip"><span>${icon}</span> ${escapeHtml(file.name)} <span class="fc-size">${fileSize(file.size)}</span></div>`;
   }).join('');
 }
 
@@ -345,6 +353,23 @@ async function sendMessage() {
 
   const message = input.value.trim();
   if (!message && !pendingFiles.length) return;
+
+  // ── Auto-name chat from first user message ──────────────────────
+  const currentChat = allChats.find(c => c._id === activeChatId);
+  const isUnnamed = !currentChat?.title || currentChat.title === 'New chat' || currentChat.title === 'New conversation';
+  if (isUnnamed && (message || pendingFiles.length)) {
+    const rawName = message
+      ? message.slice(0, 50).replace(/[^\w\s\-]/g, '').trim()
+      : pendingFiles[0]?.name?.replace(/\.[^.]+$/, '') || 'Uploaded file';
+    const newTitle = rawName.length > 3 ? rawName : 'New chat';
+    try {
+      await apiFetch(`/chats/${activeChatId}`, { method: 'PATCH', body: JSON.stringify({ title: newTitle }) });
+      allChats = allChats.map(c => c._id === activeChatId ? { ...c, title: newTitle } : c);
+      const titleEl = document.getElementById('chatTitle');
+      if (titleEl) titleEl.textContent = newTitle;
+      renderChatList(allChats);
+    } catch (_) { /* non-fatal */ }
+  }
 
   isStreaming = true;
   sendBtn.disabled = true;
@@ -416,16 +441,16 @@ function renderChatList(chats) {
   }
 
   chatList.innerHTML = filtered.map((chat) => `
-    <div class="chat-item${activeChatId === chat._id ? ' active' : ''}" data-id="${chat._id}">
-      <svg class="chat-item-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-      <span class="chat-item-label" id="label-${chat._id}">${escapeHtml(chat.title || 'Untitled')}</span>
-      <div class="chat-item-actions">
-        <button class="chat-item-btn" type="button" data-action="rename" data-id="${chat._id}" title="Rename">✎</button>
-        <button class="chat-item-btn del" type="button" data-action="delete" data-id="${chat._id}" title="Delete">✕</button>
+    <div class="chat-row${activeChatId === chat._id ? ' active' : ''}" data-id="${chat._id}">
+      <svg class="chat-row-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+      <span class="chat-row-label" id="label-${chat._id}">${escapeHtml(chat.title || 'Untitled')}</span>
+      <div class="chat-row-actions">
+        <button class="chat-row-btn" type="button" data-action="rename" data-id="${chat._id}" title="Rename">✎</button>
+        <button class="chat-row-btn del" type="button" data-action="delete" data-id="${chat._id}" title="Delete">✕</button>
       </div>
     </div>`).join('');
 
-  chatList.querySelectorAll('.chat-item').forEach((item) => {
+  chatList.querySelectorAll('.chat-row').forEach((item) => {
     item.addEventListener('click', (event) => {
       if (event.target.closest('[data-action]')) return;
       const chatId = item.dataset.id;
@@ -470,7 +495,7 @@ function selectChat(chat) {
     if (message.role === 'user' && content.startsWith('📎 Attached:')) {
       const parts = content.split('\n');
       const fileName = parts[0].replace('📎 Attached:', '').trim();
-      chips = `<div class="msg-file-chip"><span class="file-icon">${fileIcon(fileName)[0]}</span> ${escapeHtml(fileName)}</div>`;
+      chips = `<div class="file-chip"><span class="ft-icon">${fileIcon(fileName)[0]}</span> ${escapeHtml(fileName)}</div>`;
       content = parts.slice(1).join('\n').trim();
     }
     appendMessage(message.role, content, message.role === 'assistant' ? (userPlan === 'free' ? 'free' : 'claude') : null, chips);
@@ -492,7 +517,7 @@ async function regenerateLast() {
   if (!activeChatId || isStreaming) return;
   const messagesEl = document.getElementById('messages');
   if (!messagesEl) return;
-  const userMessages = messagesEl.querySelectorAll('.msg.user');
+  const userMessages = messagesEl.querySelectorAll('.msg-row.user');
   if (!userMessages.length) return;
   const lastUserBubble = userMessages[userMessages.length - 1].querySelector('.msg-bubble');
   const lastMessage = lastUserBubble?.textContent?.trim();
@@ -510,7 +535,7 @@ async function renameChat(chatId) {
   if (!labelEl) return;
   const currentTitle = labelEl.textContent;
   const input = document.createElement('input');
-  input.className = 'chat-item-rename-input';
+  input.className = 'chat-row-rename-input';
   input.value = currentTitle;
   labelEl.replaceWith(input);
   input.focus();
@@ -683,7 +708,7 @@ function initChatPage() {
     if (messagesEl) messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
   });
 
-  document.querySelectorAll('.es-card[data-prompt]').forEach((button) => {
+  document.querySelectorAll('.welcome-chip[data-prompt]').forEach((button) => {
     button.addEventListener('click', () => {
       if (chatInput) {
         chatInput.value = button.dataset.prompt;
@@ -698,7 +723,7 @@ function initChatPage() {
     button.disabled = true;
     button.textContent = '…';
     try {
-      const { chat } = await apiFetch('/chats', { method: 'POST', body: JSON.stringify({ title: 'New conversation' }) });
+      const { chat } = await apiFetch('/chats', { method: 'POST', body: JSON.stringify({ title: 'New chat' }) });
       allChats.unshift(chat);
       renderChatList(allChats);
       selectChat(chat);
@@ -805,7 +830,7 @@ function renderFiles(files) {
       : 'Processed';
     const date = f.createdAt ? new Date(f.createdAt).toLocaleDateString() : '';
     return `<div class="file-item">
-      <div class="file-icon">${fileIcon(f.originalName)}</div>
+      <div class="ft-icon">${fileIcon(f.originalName)}</div>
       <div class="file-info">
         <div class="name">${f.originalName}</div>
         <div class="meta">${docType} · ${summary} · ${formatSize(f.size)}${date ? ' · ' + date : ''}</div>
@@ -824,7 +849,7 @@ function renderMappings(mappings) {
   if (!mappings.length) { el.innerHTML = '<p class="muted text-sm">No mappings saved yet.</p>'; return; }
   el.innerHTML = '<div class="file-list">' + mappings.map(m => `
     <div class="file-item">
-      <div class="file-icon">🗺️</div>
+      <div class="ft-icon">🗺️</div>
       <div class="file-info">
         <div class="name"><code>${m.sourceField}</code> → <code>${m.targetField}</code></div>
         <div class="meta">${m.description || 'Field mapping'}</div>

@@ -70,6 +70,7 @@ async function uploadInChat(req, res) {
     }, plan);
 
     const fileRecord = await FileItem.create({
+      chatSession: id,
       userId: req.user.id,
       filename: req.file.filename,
       originalName: req.file.originalname,
@@ -82,7 +83,7 @@ async function uploadInChat(req, res) {
     });
 
     // Now answer with this file in context
-    const allFiles = await FileItem.find({ userId: req.user.id });
+    const allFiles = await FileItem.find({ userId: req.user.id, chatSession: id });
     const priorMessages = (chat.messages || []).slice(-10).map(m => ({ role: m.role, content: m.content }));
 
     const userPrompt = message.trim()
@@ -114,7 +115,7 @@ async function sendMessage(req, res) {
   if (!chat) return res.status(404).json({ error: 'Chat not found' });
 
   const [files, plan] = await Promise.all([
-    FileItem.find({ userId: req.user.id }),
+    FileItem.find({ userId: req.user.id, chatSession: id }),
     getUserPlan(req.user.id)
   ]);
 
