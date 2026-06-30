@@ -395,9 +395,9 @@
     /* ── Mobile ──────────────────────────────────────────────────── */
     .sidebar-overlay {
       display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.55); z-index: 49;
+      background: rgba(0,0,0,0.55); z-index: 49; pointer-events: none;
     }
-    .sidebar-overlay.show { display: block; }
+    .sidebar-overlay.show { display: block; pointer-events: auto; }
     @media (max-width: 720px) {
       .sidebar {
         position: fixed; top: 0; left: -270px; z-index: 50;
